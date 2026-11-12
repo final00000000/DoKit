@@ -158,7 +158,7 @@ cd Android
 - **16KB page size**：demo 依赖中的 `epic`、`fresco 1.13`、`wcdb` 原生库未按 16KB 对齐，16KB 设备上可能加载失败。
 - **ASM frames**：`DoKitTransformTask` 目前使用 `COMPUTE_MAXS`；release 的 `minifyEnabled` 仍为 false，R8 路径尚未验证，建议改为可靠的 `COMPUTE_FRAMES`。
 - **AGP 9 过渡开关**：`android.builtInKotlin=false`、`android.newDsl=false`、`android.nonTransitiveRClass=false` 为临时兼容项，后续应迁移 Kotlin DSL 并移除。
-- **单元测试基线**：`WebSocketClientTest` 中的 `Thread.currentThread().join()` 会导致测试永久挂起，`dokit-mc` 的示例测试依赖未 mock 的 `org.json`，测试套件尚未全绿。
+- **单元测试基线**：原仓库中会挂起、依赖内网地址或依赖未 mock 的 `org.json` 的调试测试已清理；当前保留的单元测试覆盖有限，尚未形成完整测试基线。
 - **发布前检查**：`config.gradle` 的 `archives_type` / `run_env` / `use_local` 当前为本地开发配置；版本号仍为 `3.7.14.9-kotlin-13`，正式发布前需恢复配置并升级版本。
 
 ---
