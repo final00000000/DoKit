@@ -4,11 +4,11 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.didichuxing.doraemonkit.R;
 import com.didichuxing.doraemonkit.widget.easyrefresh.ILoadMoreView;
-import com.github.ybq.android.spinkit.SpinKitView;
 
 
 
@@ -19,7 +19,7 @@ import com.github.ybq.android.spinkit.SpinKitView;
 public class SimpleLoadMoreView extends FrameLayout implements ILoadMoreView {
 
     private TextView tvHitText;
-    private SpinKitView spinKitView;
+    private ProgressBar spinKitView;
     private View view;
 
     public SimpleLoadMoreView(Context context) {
@@ -30,7 +30,7 @@ public class SimpleLoadMoreView extends FrameLayout implements ILoadMoreView {
         super(context, attrs);
         view = inflate(context, R.layout.dk_refresh_default_load_more, this);
         tvHitText = (TextView) view.findViewById(R.id.tv_hit_content);
-        spinKitView = (SpinKitView) view.findViewById(R.id.spin_kit);
+        spinKitView = (ProgressBar) view.findViewById(R.id.spin_kit);
 
     }
 

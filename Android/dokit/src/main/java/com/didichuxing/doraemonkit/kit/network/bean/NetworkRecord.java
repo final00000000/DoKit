@@ -3,6 +3,7 @@ package com.didichuxing.doraemonkit.kit.network.bean;
 import android.text.TextUtils;
 
 import java.io.Serializable;
+import java.util.Locale;
 
 /**
  * @desc: 一条网络请求记录
@@ -33,10 +34,12 @@ public class NetworkRecord implements Serializable {
 
 
     public boolean isGetRecord() {
-        return mRequest != null && mRequest.method != null && TextUtils.equals(METHOD_GET, mRequest.method.toLowerCase());
+        return mRequest != null && mRequest.method != null
+                && TextUtils.equals(METHOD_GET, mRequest.method.toLowerCase(Locale.ROOT));
     }
 
     public boolean isPostRecord() {
-        return mRequest != null && mRequest.method != null && TextUtils.equals(METHOD_POST, mRequest.method.toLowerCase());
+        return mRequest != null && mRequest.method != null
+                && TextUtils.equals(METHOD_POST, mRequest.method.toLowerCase(Locale.ROOT));
     }
 }

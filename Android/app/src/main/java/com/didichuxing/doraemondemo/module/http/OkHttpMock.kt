@@ -1,11 +1,18 @@
 package com.didichuxing.doraemondemo.module.http
 
 import android.util.Log
+import com.didichuxing.doraemondemo.App
 import com.didichuxing.doraemondemo.old.MainDebugActivityOkhttpV3
-import com.lzy.okgo.OkGo
-import com.lzy.okgo.callback.StringCallback
-import com.lzy.okgo.model.Response
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.FormBody
+import okhttp3.MediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.Response
 import org.json.JSONObject
+import java.io.IOException
 
 
 /**
@@ -21,57 +28,57 @@ import org.json.JSONObject
 
 object OkHttpMock {
 
+    private const val URL = "https://wanandroid.com/user_article/list/0/json"
+
+    private val client: OkHttpClient
+        get() = App.httpClient ?: OkHttpClient()
 
     fun test() {
-
         val jsonObject = JSONObject()
         jsonObject.put("c", "cc")
         jsonObject.put("d", "dd")
-        OkGo.post<String>("https://wanandroid.com/user_article/list/0/json?b=bb&a=aa")
-            .upJson(jsonObject)
-            .execute(object : StringCallback() {
-                override fun onSuccess(response: Response<String>?) {
-                    response?.let {
-                        Log.i(MainDebugActivityOkhttpV3.TAG, "okhttp====onSuccess===>" + it.body())
-                    }
-                }
-
-            })
-
+        val request = Request.Builder()
+            .url("$URL?b=bb&a=aa")
+            .post(RequestBody.create(MediaType.parse("application/json"), jsonObject.toString()))
+            .build()
+        enqueue(request)
     }
 
     fun test2() {
-        OkGo.post<String>("https://wanandroid.com/user_article/list/0/json?b=bb&a=aa")
-            .params("c", "cc")
-            .params("d", "dd")
-            .execute()
-
+        val body = FormBody.Builder()
+            .add("c", "cc")
+            .add("d", "dd")
+            .build()
+        val request = Request.Builder()
+            .url("$URL?b=bb&a=aa")
+            .post(body)
+            .build()
+        enqueue(request)
     }
 
-
     fun test3() {
-        OkGo.get<String>("https://wanandroid.com/user_article/list/0/json?a=aa&b=bb")
-            //.upJson(json.toString())
-            .execute(object : StringCallback() {
-                override fun onSuccess(response: Response<String>?) {
-                    response?.let {
-                        Log.i(
-                            MainDebugActivityOkhttpV3.TAG,
-                            "okhttp====onSuccess===>" + it.body()
-                        )
-                    }
-                }
+        val request = Request.Builder()
+            .url("$URL?a=aa&b=bb")
+            .get()
+            .build()
+        enqueue(request)
+    }
 
-                override fun onError(response: Response<String>?) {
-                    response?.let {
-                        Log.i(
-                            MainDebugActivityOkhttpV3.TAG,
-                            "okhttp====onError===>" + it.message()
-                        )
-                    }
-                }
+    private fun enqueue(request: Request) {
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.i(MainDebugActivityOkhttpV3.TAG, "okhttp====onError===>" + e.message)
+            }
 
-            })
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    Log.i(
+                        MainDebugActivityOkhttpV3.TAG,
+                        "okhttp====onSuccess===>" + it.body()?.string()
+                    )
+                }
+            }
+        })
     }
 
 }

@@ -108,8 +108,8 @@ public class PersonDBHelper extends SQLiteOpenHelper {
 
         while (!res.isAfterLast()) {
             arrayList.add(
-                    res.getString(res.getColumnIndex(PERSON_COLUMN_FIRST_NAME)) + " " +
-                            res.getString(res.getColumnIndex(PERSON_COLUMN_LAST_NAME)));
+                    res.getString(res.getColumnIndexOrThrow(PERSON_COLUMN_FIRST_NAME)) + " " +
+                            res.getString(res.getColumnIndexOrThrow(PERSON_COLUMN_LAST_NAME)));
             res.moveToNext();
         }
         res.close();

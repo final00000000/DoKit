@@ -1,10 +1,15 @@
 package com.didichuxing.doraemondemo
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import com.didichuxing.doraemondemo.mc.MCActivity
 import com.didichuxing.doraemondemo.module.CrashTest
@@ -35,10 +40,15 @@ import com.didichuxing.doraemonkit.util.ToastUtils
 
 class MainDoKitActivity : BaseStatusBarActivity() {
 
+    companion object {
+        private const val REQUEST_NOTIFICATIONS = 0x3001
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dokit_main)
+        requestNotificationPermission()
         val all: ViewGroup = findViewById<ViewGroup>(R.id.all)
 
         all.children.forEach {
@@ -51,6 +61,21 @@ class MainDoKitActivity : BaseStatusBarActivity() {
         }
     }
 
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                REQUEST_NOTIFICATIONS
+            )
+        }
+    }
 
     private fun onItemClick(itemView: DoKitItemView, text: String) {
         Log.i("TEST", "onItemClick :$text")

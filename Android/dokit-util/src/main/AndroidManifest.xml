@@ -3,4 +3,7 @@
     package="com.didichuxing.doraemonkit.util">
 
     <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE" />
+    <!-- Declared for API 33+ notification delivery; the host app decides
+         whether/when to request this runtime permission. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

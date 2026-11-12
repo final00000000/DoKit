@@ -3,10 +3,9 @@ package com.didichuxing.doraemonkit.plugin.transform.classtransform
 import com.didichuxing.doraemonkit.plugin.extension.DoKitExtension
 import com.didichuxing.doraemonkit.plugin.lastPath
 import com.didichuxing.doraemonkit.plugin.println
-import com.didiglobal.booster.kotlinx.asIterable
-import com.didiglobal.booster.transform.TransformContext
-import com.didiglobal.booster.transform.asm.className
-import org.gradle.api.Project
+import com.didichuxing.doraemonkit.plugin.asIterable
+import com.didichuxing.doraemonkit.plugin.transform.TransformContext
+import com.didichuxing.doraemonkit.plugin.transform.className
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.*
 
@@ -24,7 +23,7 @@ import org.objectweb.asm.tree.*
 
 class Okhttp3ClassTransformer : AbsClassTransformer() {
 
-    override fun transform(project: Project, dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
+    override fun transform(dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
         val className = klass.className
 
         if (dokit.networkEnable && dokit.network.okHttp) {

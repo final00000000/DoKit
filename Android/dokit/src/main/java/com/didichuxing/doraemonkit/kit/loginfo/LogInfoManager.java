@@ -22,6 +22,8 @@ import java.util.List;
 public class LogInfoManager {
     private static final String TAG = "LogInfoManager";
     private static final int MESSAGE_PUBLISH_LOG = 1001;
+    private static final int LOG_BATCH_SIZE = 50;
+    private static final long LOG_BATCH_INTERVAL_MILLIS = 100L;
 
     private OnLogCatchListener mListener;
 
@@ -49,6 +51,7 @@ public class LogInfoManager {
     public void stop() {
         if (mLogCatchTask != null) {
             mLogCatchTask.stop();
+            mLogCatchTask = null;
         }
     }
 
@@ -98,9 +101,9 @@ public class LogInfoManager {
      * 获取日志的内部线程
      */
     private static class LogCatchRunnable implements Runnable {
-        private boolean isRunning = true;
+        private volatile boolean isRunning = true;
         private Handler internalHandler;
-        private LogcatReader mReader;
+        private volatile LogcatReader mReader;
         private int mPid;
 
         private LogCatchRunnable() {
@@ -110,14 +113,21 @@ public class LogInfoManager {
 
         @Override
         public void run() {
+            LogcatReader reader = null;
             try {
+                if (!isRunning) {
+                    return;
+                }
                 LogcatReaderLoader loader = LogcatReaderLoader.create(true);
-                mReader = loader.loadReader();
+                reader = loader.loadReader();
+                mReader = reader;
 
                 String line;
                 int maxLines = 10000;
                 LinkedList<LogLine> initialLines = new LinkedList<>();
-                while ((line = mReader.readLine()) != null && isRunning) {
+                ArrayList<LogLine> pendingLines = new ArrayList<>(LOG_BATCH_SIZE);
+                long lastPublishAt = android.os.SystemClock.uptimeMillis();
+                while (isRunning && (line = reader.readLine()) != null) {
                     LogLine logLine = LogLine.newLogLine(line, false);
                     if (!mReader.readyToRecord()) {
                         if (logLine.getProcessId() == mPid) {
@@ -130,29 +140,52 @@ public class LogInfoManager {
                         if (logLine.getProcessId() == mPid) {
                             initialLines.add(logLine);
                         }
-                        Message message = Message.obtain();
-                        message.what = MESSAGE_PUBLISH_LOG;
-                        message.obj = new ArrayList<>(initialLines);
-                        internalHandler.sendMessage(message);
+                        pendingLines.addAll(initialLines);
                         initialLines.clear();
                     } else {
                         // just proceed as normal
                         if (logLine.getProcessId() == mPid) {
-                            Message message = Message.obtain();
-                            message.what = MESSAGE_PUBLISH_LOG;
-                            message.obj = Collections.singletonList(logLine);
-                            internalHandler.sendMessage(message);
+                            pendingLines.add(logLine);
                         }
                     }
+                    long now = android.os.SystemClock.uptimeMillis();
+                    if (pendingLines.size() >= LOG_BATCH_SIZE
+                            || now - lastPublishAt >= LOG_BATCH_INTERVAL_MILLIS) {
+                        publish(pendingLines);
+                        lastPublishAt = now;
+                    }
                 }
-                mReader.killQuietly();
+                publish(pendingLines);
             } catch (IOException e) {
-                LogHelper.e(TAG, e.toString());
+                if (isRunning) {
+                    LogHelper.e(TAG, e.toString());
+                }
+            } finally {
+                if (reader != null) {
+                    reader.killQuietly();
+                }
+                mReader = null;
             }
+        }
+
+        private void publish(ArrayList<LogLine> pendingLines) {
+            if (pendingLines.isEmpty() || !isRunning) {
+                pendingLines.clear();
+                return;
+            }
+            Message message = Message.obtain(internalHandler, MESSAGE_PUBLISH_LOG,
+                    new ArrayList<>(pendingLines));
+            internalHandler.sendMessage(message);
+            pendingLines.clear();
         }
 
         public void stop() {
             isRunning = false;
+            LogcatReader reader = mReader;
+            if (reader != null) {
+                reader.killQuietly();
+            }
+            internalHandler.removeCallbacksAndMessages(null);
         }
     }
 }

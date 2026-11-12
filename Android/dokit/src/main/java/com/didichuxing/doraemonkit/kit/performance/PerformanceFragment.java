@@ -1,7 +1,8 @@
 package com.didichuxing.doraemonkit.kit.performance;
 
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.TextView;
 
@@ -18,9 +19,11 @@ import com.didichuxing.doraemonkit.widget.titlebar.TitleBar;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class PerformanceFragment extends BaseFragment {
     public final static int CPU = 0;
@@ -32,6 +35,14 @@ public class PerformanceFragment extends BaseFragment {
     private TextView parameter;
     private TextView time;
     private TextView date;
+    /**
+     * AsyncTask was removed from the modern Android API surface.  Keep file I/O
+     * off the UI thread with a short-lived, fragment-owned executor instead.
+     */
+    private final ExecutorService dataExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Future<?> loadDataFuture;
+    private volatile boolean viewActive;
 
     @Override
 
@@ -48,6 +59,7 @@ public class PerformanceFragment extends BaseFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        viewActive = true;
         initview();
     }
 
@@ -80,26 +92,30 @@ public class PerformanceFragment extends BaseFragment {
 
 
         TextView model = findViewById(R.id.model);
+        String dataPath = null;
         Bundle arguments = getArguments();
         if (arguments != null) {
             int type = arguments.getInt(BundleKey.PERFORMANCE_TYPE, CPU);
             if (type == RAM) {
                 builder.setMaxValue((int) PerformanceDataManager.getInstance().getMaxMemory()).setMinValue(0);
                 model.setText(R.string.dk_frameinfo_ram);
-                new LoadDataTask().execute(PerformanceDataManager.getInstance().getMemoryFilePath());
+                dataPath = PerformanceDataManager.getInstance().getMemoryFilePath();
             } else if (type == FPS) {
                 builder.setMaxValue(100).setMinValue(0);
                 model.setText(R.string.dk_frameinfo_fps);
-                new LoadDataTask().execute(PerformanceDataManager.getInstance().getFpsFilePath());
+                dataPath = PerformanceDataManager.getInstance().getFpsFilePath();
             } else {
                 builder.setMaxValue(100).setMinValue(0);
                 model.setText(R.string.dk_frameinfo_cpu);
-                new LoadDataTask().execute(PerformanceDataManager.getInstance().getCpuFilePath());
+                dataPath = PerformanceDataManager.getInstance().getCpuFilePath();
             }
         }
 
         adapter = builder.build();
         dataShow.setAdapter(adapter);
+        if (dataPath != null) {
+            loadData(dataPath);
+        }
 
 
         parameter = findViewById(R.id.parameter);
@@ -130,44 +146,71 @@ public class PerformanceFragment extends BaseFragment {
     }
 
 
-    private class LoadDataTask extends AsyncTask<String, Integer, List<PerformanceData>> {
-        @Override
-        protected void onPostExecute(List<PerformanceData> result) {
-            performanceDataAdapter.append(result);
-            adapter.setData(result);
-            if (result.size() > 1) {
-                updateTips(result.get(1));
-            }
+    private void loadData(final String path) {
+        if (loadDataFuture != null) {
+            loadDataFuture.cancel(true);
         }
-
-        @Override
-        protected List doInBackground(String... strings) {
-            File file = new File(strings[0]);
-            ArrayList<PerformanceData> datas = new ArrayList<>();
-            if (file.exists()) {
-                BufferedReader reader = null;
-                try {
-                    reader = new BufferedReader(new FileReader(file));
-                    String tempString = null;
-                    while ((tempString = reader.readLine()) != null) {
-                        String[] split = tempString.split(" ");
-                        datas.add(new PerformanceData(split[1], split[2], Float.valueOf(split[0])));
-                    }
-                    reader.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    if (reader != null) {
-                        try {
-                            reader.close();
-                        } catch (IOException e1) {
-                            e1.printStackTrace();
+        loadDataFuture = dataExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                final List<PerformanceData> result = readData(path);
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!viewActive || performanceDataAdapter == null || adapter == null) {
+                            return;
+                        }
+                        performanceDataAdapter.append(result);
+                        adapter.setData(result);
+                        if (result.size() > 1) {
+                            updateTips(result.get(1));
                         }
                     }
-                }
+                });
             }
+        });
+    }
+
+    private List<PerformanceData> readData(String path) {
+        File file = new File(path);
+        ArrayList<PerformanceData> datas = new ArrayList<>();
+        if (!file.exists()) {
             return datas;
         }
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String tempString;
+            while (!Thread.currentThread().isInterrupted() && (tempString = reader.readLine()) != null) {
+                String[] split = tempString.trim().split("\\s+");
+                if (split.length >= 3) {
+                    datas.add(new PerformanceData(split[1], split[2], Float.valueOf(split[0])));
+                }
+            }
+        } catch (Exception e) {
+            if (!Thread.currentThread().isInterrupted()) {
+                e.printStackTrace();
+            }
+        }
+        return datas;
+    }
+
+    @Override
+    public void onDestroyView() {
+        viewActive = false;
+        if (loadDataFuture != null) {
+            loadDataFuture.cancel(true);
+            loadDataFuture = null;
+        }
+        mainHandler.removeCallbacksAndMessages(null);
+        super.onDestroyView();
+    }
+
+    @Override
+    public void onDestroy() {
+        dataExecutor.shutdownNow();
+        super.onDestroy();
     }
 
 

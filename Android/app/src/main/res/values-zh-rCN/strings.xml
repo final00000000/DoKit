@@ -20,4 +20,9 @@
     <string name="app_btn_create_database">创建数据库</string>
     <string name="app_btn_upload_file">上传文件</string>
     <string name="app_btn_download_file">下载文件</string>
+    <string name="dk_kit_demo">demo</string>
+    <string name="dk_titlebar_back">&#060;</string>
+    <string name="app_btn_installed_app">获取已安装的app</string>
+    <string name="app_btn_path_amap">高德路径规划</string>
+    <string name="dk_kit_gps_mock_preset">位置预设</string>
 </resources>

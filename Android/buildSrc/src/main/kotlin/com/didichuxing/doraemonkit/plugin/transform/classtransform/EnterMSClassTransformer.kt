@@ -5,10 +5,9 @@ import com.didichuxing.doraemonkit.plugin.extension.DoKitExtension
 import com.didichuxing.doraemonkit.plugin.extension.SlowMethodExtension
 import com.didichuxing.doraemonkit.plugin.stack_method.MethodStackNode
 import com.didichuxing.doraemonkit.plugin.stack_method.MethodStackNodeUtil
-import com.didiglobal.booster.transform.TransformContext
-import com.didiglobal.booster.transform.asm.asIterable
-import com.didiglobal.booster.transform.asm.className
-import org.gradle.api.Project
+import com.didichuxing.doraemonkit.plugin.asIterable
+import com.didichuxing.doraemonkit.plugin.transform.TransformContext
+import com.didichuxing.doraemonkit.plugin.transform.className
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.*
 
@@ -32,7 +31,7 @@ class EnterMSClassTransformer : AbsClassTransformer() {
     private val thresholdTime = DoKitExtUtil.slowMethodExt.stackMethod.thresholdTime
     private val level = 0
 
-    override fun transform(project: Project, dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
+    override fun transform(dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
         if (!DoKitExtUtil.dokitSlowMethodSwitchOpen()) {
             return klass
         }

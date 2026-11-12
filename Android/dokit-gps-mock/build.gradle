@@ -6,6 +6,7 @@ apply plugin: 'kotlin-kapt'
 apply from: '../upload.gradle'
 
 android {
+    namespace "com.didichuxing.doraemonkit.gps_mock"
     compileSdkVersion rootProject.ext.android["compileSdkVersion"]
 
     defaultConfig {

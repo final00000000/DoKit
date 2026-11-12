@@ -19,6 +19,7 @@ public class SingleLogcatReader extends AbsLogcatReader {
     private BufferedReader bufferedReader;
     private String logBuffer;
     private String lastLine;
+    private volatile boolean closed;
 
     public SingleLogcatReader(boolean recordingMode, String logBuffer, String lastLine) throws IOException {
         super(recordingMode);
@@ -43,13 +44,26 @@ public class SingleLogcatReader extends AbsLogcatReader {
 
     @Override
     public void killQuietly() {
+        closed = true;
+        if (bufferedReader != null) {
+            try {
+                bufferedReader.close();
+            } catch (IOException ignored) {
+                // The process is destroyed below; closing the stream is best effort.
+            }
+        }
         if (logcatProcess != null) {
             RuntimeHelper.destroy(logcatProcess);
+            logcatProcess = null;
         }
+        bufferedReader = null;
     }
 
     @Override
     public String readLine() throws IOException {
+        if (closed || bufferedReader == null) {
+            return null;
+        }
         String line = bufferedReader.readLine();
 
         if (recordingMode && lastLine != null) { // still skipping past the 'last line'
@@ -82,6 +96,8 @@ public class SingleLogcatReader extends AbsLogcatReader {
 
     @Override
     public List<Process> getProcesses() {
-        return Collections.singletonList(logcatProcess);
+        return logcatProcess == null
+                ? Collections.<Process>emptyList()
+                : Collections.singletonList(logcatProcess);
     }
 }

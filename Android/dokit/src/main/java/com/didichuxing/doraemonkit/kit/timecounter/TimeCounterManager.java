@@ -1,7 +1,5 @@
 package com.didichuxing.doraemonkit.kit.timecounter;
 
-import android.os.Looper;
-
 import com.didichuxing.doraemonkit.DoKit;
 import com.didichuxing.doraemonkit.util.GsonUtils;
 import com.didichuxing.doraemonkit.aop.DokitPluginConfig;
@@ -131,7 +129,9 @@ public class TimeCounterManager {
         if (!mIsRunning) {
             return;
         }
-        Looper.getMainLooper().setMessageLogging(null);
+        // Activity timing no longer installs a Printer/ActivityThread hook.
+        // Do not clear the main looper's message logger here: it may belong to
+        // another diagnostic component (for example BlockMonitorManager).
         mIsRunning = false;
         DoKit.removeFloating(TimeCounterDoKitView.class);
 

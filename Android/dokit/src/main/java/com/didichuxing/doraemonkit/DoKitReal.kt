@@ -21,7 +21,6 @@ import com.didichuxing.doraemonkit.kit.health.AppHealthInfoUtil
 import com.didichuxing.doraemonkit.kit.health.model.AppHealthInfo.DataBean.BigFileBean
 import com.didichuxing.doraemonkit.kit.network.NetworkManager
 import com.didichuxing.doraemonkit.kit.network.okhttp.interceptor.DokitExtInterceptor
-import com.didichuxing.doraemonkit.kit.timecounter.instrumentation.HandlerHooker
 import com.didichuxing.doraemonkit.kit.toolpanel.KitWrapItem
 import com.didichuxing.doraemonkit.kit.toolpanel.ToolPanelUtil
 import com.didichuxing.doraemonkit.kit.webdoor.WebDoorManager
@@ -72,9 +71,6 @@ object DoKitReal {
         if (!ProcessUtils.isMainProcess()) {
             return
         }
-
-        //解锁系统隐藏api限制权限以及hook Instrumentation
-        HandlerHooker.doHook(app)
 
         val strDokitMode = DoKitSPUtil.getString(SharedPrefsKey.FLOAT_START_MODE, "normal")
         DoKitManager.IS_NORMAL_FLOAT_MODE = strDokitMode == "normal"

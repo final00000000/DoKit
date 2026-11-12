@@ -3,37 +3,38 @@ ext {
         //0:发布到到本地localRepoURL仓库
         //1:发布到滴滴内部仓库 一般不建议使用 如果需要发布到滴滴内网仓库需要将版本号改得比较大 假如版本号跟jcenter上的一致会由于缓存导致没法下载最新的jcenter的线上代码
         //2:发布到maven_central远程仓库
-        archives_type: 0,
+        // -1: 普通开发构建，不配置发布仓库
+        archives_type: -1,
         //0:依赖dokit本地module运行
         //1:依赖dokit远程aar运行
         run_type     : 0,
         //0:外部公共环境
         //1:内部私有环境，使用私有仓库构建，仓库地址在 local.properties 中添加 PRIVATE_REPOSITORY_URL
-        run_env      : 1,
+        run_env      : 0,
         //是否使用本地仓库，需要使用绝对路径，仓库地址在 local.properties 中添加 LOCAL_REPOSITORY_URL
-        use_local    : true,
+        use_local    : false,
 //        group_id     : 'io.github.didi.dokit',
         group_id     : 'com.didichuxing.doraemonkit',
         version      : '3.7.14.9-kotlin-13'
     ]
 
-    android = [compileSdkVersion             : 31,
+    android = [compileSdkVersion             : 37,
                applicationId                 : "com.didichuxing.doraemondemo",
                minSdkVersion_16              : 16,
                minSdkVersion_21              : 21,
-               targetSdkVersion              : 31,
+               targetSdkVersion              : 37,
                //app版本号
                versionCode                   : 1,
                versionName                   : "1.0.0",
                glide_version                 : "4.9.0",
-               kotlin_version_v13            : "1.3.72",
-               kotlin_version_v14            : "1.4.32",
-               kotlin_version_v15            : "1.5.31",
+               kotlin_version_v13            : "2.4.21",
+               kotlin_version_v14            : "2.4.21",
+               kotlin_version_v15            : "2.4.21",
                kotlinx_coroutines_version_v13: "1.3.7",
                kotlinx_coroutines_version_v14: "1.4.3",
                booster_version               : "4.13.0",
-               agp_module_verson             : "7.0.0",
-               agp_plugin_verson             : "4.2.2",
+               agp_module_verson             : "9.2.1",
+               agp_plugin_verson             : "9.2.1",
                ktor                          : "1.5.4",
                okhttp_v2                     : "2.7.5",
                okhttp_v3                     : "3.14.7",
@@ -58,7 +59,7 @@ ext {
                     "core-ktx"                      : "androidx.core:core-ktx:1.3.0",
                     "activity-ktx"                  : "androidx.activity:activity-ktx:1.1.0",
                     "webkit"                        : "androidx.webkit:webkit:1.3.0",
-                    "volley"                        : "com.android.volley:volley:1.1.1",
+                    "volley"                        : "com.android.volley:volley:1.2.1",
                     "fragment"                      : "androidx.fragment:fragment:1.2.0",
                     "fragment-ktx"                  : "androidx.fragment:fragment-ktx:1.2.0",
                     "drawerlayout"                  : "androidx.drawerlayout:drawerlayout:1.1.1",
@@ -100,7 +101,7 @@ ext {
                     //将urlconnection代理到okhttp
                     //"okhttp_urlconnection"    : "com.squareup.okhttp3:okhttp-urlconnection:3.12.1",
                     "okio"                          : "com.squareup.okio:okio:1.17.2",
-                    "utilcode"                      : 'com.blankj:utilcodex:1.29.0',
+                    "utilcode"                      : 'com.blankj:utilcodex:1.31.1',
                     "glide"                         : "com.github.bumptech.glide:glide:${android["glide_version"]}",
                     "glide_v3"                      : 'com.github.bumptech.glide:glide:3.8.0',
                     "glide_okhttp3"                 : "com.github.bumptech.glide:okhttp3-integration:${android["glide_version"]}",
@@ -109,13 +110,12 @@ ext {
                     "coil_v13"                      : "io.coil-kt:coil:${android["coil_v13"]}",
                     "picasso"                       : 'com.squareup.picasso:picasso:2.71828',
                     "fresco"                        : 'com.facebook.fresco:fresco:1.13.0',
-                    "fresco-processors"             : "jp.wasabeef:fresco-processors:2.1.0",
                     "image-loader"                  : 'com.nostra13.universalimageloader:universal-image-loader:1.9.5',
                     "rootbeer-lib"                  : 'com.scottyab:rootbeer-lib:0.0.8',
                     "gson"                          : 'com.google.code.gson:gson:2.8.2',
                     "zxing"                         : 'com.google.zxing:core:3.3.0',
                     "free_reflection"               : 'me.weishu:free_reflection:2.1.0',
-                    "leakcanary_android"            : 'com.squareup.leakcanary:leakcanary-android:2.7',
+                    "leakcanary_android"            : 'com.squareup.leakcanary:leakcanary-android:2.14',
                     "haha"                          : 'com.squareup.haha:haha:2.0.4',
                     "debug-db"                      : "com.amitshekhar.android:debug-db:1.0.6",
                     "debug-db-encrypt"              : "com.amitshekhar.android:debug-db-encrypt:1.0.6",
@@ -125,13 +125,11 @@ ext {
                     "weex_sdk"                      : "org.apache.weex:sdk:0.28.0",
                     "brvah"                         : 'com.github.CymChad:BaseRecyclerViewAdapterHelper:3.0.4',
                     "easy_refresh_layout"           : 'com.github.anzaizai:EasyRefreshLayout:1.3.1',
-                    "android_spinkit"               : 'com.github.ybq:Android-SpinKit:1.4.0',
                     "jsonviewer"                    : "com.yuyh.json:jsonviewer:1.0.6",
                     "room_runtime"                  : 'androidx.room:room-runtime:2.0.0',
                     "room_compile"                  : 'androidx.room:room-compiler:2.0.0',
                     "didi_http"                     : 'com.didichuxing.foundation:http:2.1.0.86',
                     "didi_rpc"                      : 'com.didichuxing.foundation:rpc:2.1.0.86',
-                    "okgo"                          : "com.lzy.net:okgo:3.0.4",
                     //高德地图定位
                     "amap_location"                 : 'com.amap.api:location:6.1.0',
                     //高德地图
@@ -141,15 +139,15 @@ ext {
                     "tencent_location"              : 'com.tencent.map.geolocation:TencentLocationSdk-openplatform:7.2.5',
                     "tencent_map"                   : 'com.tencent.map:tencent-map-vector-sdk:4.4.0',
                     "tencent_map_util"              : 'com.tencent.map:sdk-utilities:1.0.6',
-                    "easypermissions"               : "pub.devrel:easypermissions:2.0.1",
+                    "easypermissions"               : "pub.devrel:easypermissions:3.0.0",
                     //跨进程通信框架
                     "abridge"                       : "com.sjtu.yifei:abridge:1.0.1",
                     "jsoup"                         : "org.jsoup:jsoup:1.13.1",
                     "mimecraft"                     : "com.squareup.mimecraft:mimecraft:1.1.1",
                     //tencent x5 浏览器 https://x5.tencent.com/
-                    "tbs"                           : "com.tencent.tbs.tbssdk:sdk:43903",
+                    "tbs"                           : "com.tencent.tbs:tbssdk:44286",
 //                    "swipeback"    : "me.imid.swipebacklayout.lib:library:1.1.0"
-                    "flexbox"                       : 'com.google.android:flexbox:1.0.0',
+                    "flexbox"                       : 'com.google.android.flexbox:flexbox:3.0.0',
                     "auto_service"                  : 'com.google.auto.service:auto-service:1.0',
                     "hummer"                        : 'io.github.didi.hummer:hummer:0.3.23',
                     "sandhook_hooklib"              : 'com.swift.sandhook:hooklib:4.2.1',
@@ -177,14 +175,20 @@ ext {
 
     privateRepository = {
         Properties properties = new Properties()
-        properties.load(project.rootProject.file('local.properties').newDataInputStream())
+        def localProperties = project.rootProject.file('local.properties')
+        if (localProperties.exists()) {
+            properties.load(localProperties.newDataInputStream())
+        }
         def url = properties.getProperty('PRIVATE_REPOSITORY_URL', "")
         return url
     }
 
     localRepository = {
         Properties properties = new Properties()
-        properties.load(project.rootProject.file('local.properties').newDataInputStream())
+        def localProperties = project.rootProject.file('local.properties')
+        if (localProperties.exists()) {
+            properties.load(localProperties.newDataInputStream())
+        }
         def url = properties.getProperty('LOCAL_REPOSITORY_URL', "")
         return url
     }

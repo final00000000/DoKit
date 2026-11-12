@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.webkit.*
+import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 
@@ -24,7 +25,16 @@ class WebViewSystemActivity : AppCompatActivity() {
         initWebView(mWebView)
 
         mWebView.loadUrl(url)
-
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (mWebView.canGoBack()) {
+                    mWebView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 
 
@@ -96,13 +106,5 @@ class WebViewSystemActivity : AppCompatActivity() {
         }
     }
 
-
-    override fun onBackPressed() {
-        if (mWebView.canGoBack()) {
-            mWebView.goBack()
-        } else {
-            super.onBackPressed()
-        }
-    }
 
 }

@@ -4,6 +4,7 @@ package com.didichuxing.doraemonkit.kit.network;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.didichuxing.doraemonkit.DoKitCallBack;
 import com.didichuxing.doraemonkit.BuildConfig;
 import com.didichuxing.doraemonkit.kit.core.DoKitManager;
 import com.didichuxing.doraemonkit.kit.network.bean.NetworkRecord;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @desc: 提供网络抓包功能开启、关闭、数据统计功能的manager
@@ -83,20 +85,21 @@ public class NetworkManager {
     private static final int MAX_SIZE = 100;
 
     private long mStartTime;
-    private OnNetworkInfoUpdateListener mOnNetworkInfoUpdateListener;
+    private volatile OnNetworkInfoUpdateListener mOnNetworkInfoUpdateListener;
 
-    private int mPostCount;
-    private int mGetCount;
-    private int mTotalCount;
+    private final AtomicInteger mPostCount = new AtomicInteger();
+    private final AtomicInteger mGetCount = new AtomicInteger();
+    private final AtomicInteger mTotalCount = new AtomicInteger();
 
     public NetworkManager() {
     }
 
     public NetworkRecord getRecord(int requestId) {
-        for (NetworkRecord record :
-                mRecords) {
-            if (record.mRequestId == requestId) {
-                return record;
+        synchronized (mRecords) {
+            for (NetworkRecord record : mRecords) {
+                if (record.mRequestId == requestId) {
+                    return record;
+                }
             }
         }
         return null;
@@ -115,39 +118,56 @@ public class NetworkManager {
      * （需要根据requestId，找到对应的record），目前没找到同时满足三个条件的数据结构，暂时先保证前两者，因为限制了大小为MAX_SIZE，查找
      * 的数据量不会很大，直接foreach
      */
-    private List<NetworkRecord> mRecords = Collections.synchronizedList(new ArrayList<NetworkRecord>());
+    private final List<NetworkRecord> mRecords =
+            Collections.synchronizedList(new ArrayList<NetworkRecord>());
 
     public static NetworkManager get() {
         return NetworkManager.Holder.INSTANCE;
     }
 
     public void addRecord(int requestId, NetworkRecord record) {
-        if (mRecords.size() > MAX_SIZE) {
-            mRecords.remove(0);
+        if (record == null) {
+            return;
+        }
+        synchronized (mRecords) {
+            if (mRecords.size() >= MAX_SIZE) {
+                mRecords.remove(0);
+            }
+            mRecords.add(record);
         }
         if (record.isPostRecord()) {
-            mPostCount++;
+            mPostCount.incrementAndGet();
         } else if (record.isGetRecord()) {
-            mGetCount++;
+            mGetCount.incrementAndGet();
         }
-        mTotalCount++;
-        mRecords.add(record);
+        mTotalCount.incrementAndGet();
 
         updateRecord(record, true);
     }
 
     public void updateRecord(final NetworkRecord record, final boolean add) {
+        if (record == null) {
+            return;
+        }
+        final DoKitCallBack callback = DoKitManager.INSTANCE.getCALLBACK();
+        final OnNetworkInfoUpdateListener listener = mOnNetworkInfoUpdateListener;
+        if (!add && listener == null) {
+            return;
+        }
+        if (add && callback == null && listener == null) {
+            return;
+        }
         /**
          * post to main thread
          */
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (DoKitManager.INSTANCE.getCALLBACK() != null && add) {
-                    DoKitManager.INSTANCE.getCALLBACK().onNetworkCallBack(record);
+                if (callback != null && add) {
+                    callback.onNetworkCallBack(record);
                 }
-                if (mOnNetworkInfoUpdateListener != null) {
-                    mOnNetworkInfoUpdateListener.onNetworkInfoUpdate(record, add);
+                if (listener != null) {
+                    listener.onNetworkInfoUpdate(record, add);
                 }
             }
         });
@@ -174,7 +194,9 @@ public class NetworkManager {
     }
 
     public List<NetworkRecord> getRecords() {
-        return mRecords;
+        synchronized (mRecords) {
+            return new ArrayList<>(mRecords);
+        }
     }
 
     public void setOnNetworkInfoUpdateListener(OnNetworkInfoUpdateListener onNetworkInfoUpdateListener) {
@@ -191,7 +213,7 @@ public class NetworkManager {
 
     public long getTotalRequestSize() {
         long totalSize = 0;
-        for (NetworkRecord record : mRecords) {
+        for (NetworkRecord record : getRecords()) {
             totalSize += record.requestLength;
         }
         return totalSize;
@@ -200,7 +222,7 @@ public class NetworkManager {
 
     public long getTotalSize() {
         long totalSize = 0;
-        for (NetworkRecord record : mRecords) {
+        for (NetworkRecord record : getRecords()) {
             totalSize += record.requestLength;
             totalSize += record.responseLength;
         }
@@ -209,21 +231,21 @@ public class NetworkManager {
 
     public long getTotalResponseSize() {
         long totalSize = 0;
-        for (NetworkRecord record : mRecords) {
+        for (NetworkRecord record : getRecords()) {
             totalSize += record.responseLength;
         }
         return totalSize;
     }
 
     public int getPostCount() {
-        return mPostCount;
+        return mPostCount.get();
     }
 
     public int getGetCount() {
-        return mGetCount;
+        return mGetCount.get();
     }
 
     public int getTotalCount() {
-        return mTotalCount;
+        return mTotalCount.get();
     }
 }

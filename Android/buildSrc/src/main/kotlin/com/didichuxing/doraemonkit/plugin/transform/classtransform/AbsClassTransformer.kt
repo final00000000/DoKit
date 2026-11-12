@@ -3,11 +3,9 @@ package com.didichuxing.doraemonkit.plugin.transform.classtransform
 import com.didichuxing.doraemonkit.plugin.DoKitExtUtil
 import com.didichuxing.doraemonkit.plugin.extension.DoKitExtension
 import com.didichuxing.doraemonkit.plugin.isRelease
-import com.didichuxing.doraemonkit.plugin.transform.DoKitTransformContext
-import com.didiglobal.booster.transform.TransformContext
-import com.didiglobal.booster.transform.asm.ClassTransformer
-import com.didiglobal.booster.transform.asm.className
-import org.gradle.api.Project
+import com.didichuxing.doraemonkit.plugin.transform.ClassTransformer
+import com.didichuxing.doraemonkit.plugin.transform.TransformContext
+import com.didichuxing.doraemonkit.plugin.transform.className
 import org.objectweb.asm.tree.ClassNode
 
 /**
@@ -47,13 +45,9 @@ open class AbsClassTransformer : ClassTransformer {
             return klass
         }
 
-        if (context is DoKitTransformContext) {
-            val project = context.project()
-            val dokit = context.dokitExtension()
-            transform(project, dokit, context, klass)
-        }
+        transform(context.dokitExtension, context, klass)
         return klass
     }
 
-    open fun transform(project: Project, dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode = klass
+    open fun transform(dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode = klass
 }

@@ -1,5 +1,4 @@
 apply plugin: 'kotlin'
-apply plugin: 'kotlin-kapt'
 apply from: '../upload.gradle'
 
 sourceSets {
@@ -8,7 +7,8 @@ sourceSets {
             srcDirs += []
         }
         kotlin {
-            srcDirs += ['src/main/kotlin', 'src/main/java']
+            // buildSrc is the canonical plugin source; this module packages it for publishing.
+            srcDirs = ['../buildSrc/src/main/kotlin']
         }
     }
 
@@ -16,7 +16,7 @@ sourceSets {
 }
 
 compileKotlin {
-    kotlinOptions.jvmTarget = JavaVersion.VERSION_1_8
+    kotlinOptions.jvmTarget = JavaVersion.VERSION_17
 }
 
 
@@ -26,9 +26,8 @@ dependencies {
 
     //版本不能太高 否则会跟项目的as版本冲突
     compileOnly "com.android.tools.build:gradle:${rootProject.ext.android["agp_plugin_verson"]}"
-    /* 👇👇👇👇 引用这两个模块 👇👇👇👇 */
-    api "com.didiglobal.booster:booster-api:${rootProject.ext.android["booster_version"]}"
-    api "com.didiglobal.booster:booster-transform-asm:${rootProject.ext.android["booster_version"]}"
+    implementation "org.ow2.asm:asm:9.9"
+    implementation "org.ow2.asm:asm-tree:9.9"
 }
 
 /**
@@ -45,7 +44,6 @@ task deleteSource(type: Delete) {
 
 repositories {
     google()
-//    jcenter()
     mavenCentral()
 }
 

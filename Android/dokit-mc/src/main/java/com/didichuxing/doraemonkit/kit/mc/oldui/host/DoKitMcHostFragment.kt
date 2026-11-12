@@ -17,6 +17,7 @@ import com.didichuxing.doraemonkit.kit.mc.net.DoKitMcHostServer
 import com.didichuxing.doraemonkit.kit.mc.utils.CodeUtils
 import com.didichuxing.doraemonkit.mc.R
 import com.didichuxing.doraemonkit.util.ImageUtils
+import com.didichuxing.doraemonkit.util.LocalNetworkPermission
 import com.didichuxing.doraemonkit.util.LogHelper
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
@@ -31,6 +32,10 @@ import kotlinx.coroutines.launch
  * ================================================
  */
 class DoKitMcHostFragment : BaseFragment() {
+    companion object {
+        private const val REQUEST_LOCAL_NETWORK = 0x4D4C
+    }
+
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
         LogHelper.e(TAG, "error message: ${throwable.message}")
     }
@@ -58,9 +63,18 @@ class DoKitMcHostFragment : BaseFragment() {
         }
 
 
+        startHostIfPermitted(ivCode, tvHost)
+    }
+
+    private fun startHostIfPermitted(ivCode: ImageView, tvHost: TextView) {
+        val hostActivity = activity ?: return
+        if (!LocalNetworkPermission.request(hostActivity, REQUEST_LOCAL_NETWORK)) {
+            showToast("一机多控主机模式需要允许访问本地网络")
+            return
+        }
         val host = "ws://${DoKitManager.IP_ADDRESS_BY_WIFI}:${DoKitManager.MC_WS_PORT}/mc"
         val logo = ImageUtils.getBitmap(R.mipmap.dk_logo)
-        val qCode = CodeUtils.createCode(activity, host, logo)
+        val qCode = CodeUtils.createCode(hostActivity, host, logo)
         tvHost.text = host
         ivCode.setImageBitmap(qCode)
 
@@ -69,6 +83,25 @@ class DoKitMcHostFragment : BaseFragment() {
                 DoKitMcManager.WS_MODE = TestMode.HOST
                 //启动悬浮窗
                 DoKit.launchFloating(HostDoKitView::class)
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_LOCAL_NETWORK) {
+            if (LocalNetworkPermission.isGranted(requireContext())) {
+                val currentView = view ?: return
+                startHostIfPermitted(
+                    currentView.findViewById(R.id.iv_code),
+                    currentView.findViewById(R.id.tv_host)
+                )
+            } else {
+                showToast("未获得本地网络权限，主机模式未启动")
             }
         }
     }

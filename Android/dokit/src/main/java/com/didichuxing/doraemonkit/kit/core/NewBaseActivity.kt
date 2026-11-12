@@ -12,6 +12,11 @@ abstract class NewBaseActivity : AppCompatActivity() {
     private val mFragments = ArrayDeque<BaseFragment>()
     private var contentId = android.R.id.content
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        WindowInsetsUtils.applySystemBarInsets(findViewById(android.R.id.content))
+    }
+
     @JvmOverloads
     fun showContent(target: Class<out BaseFragment>, bundle: Bundle? = null) {
         try {

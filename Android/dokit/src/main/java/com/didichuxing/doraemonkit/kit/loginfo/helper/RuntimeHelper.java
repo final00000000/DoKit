@@ -22,9 +22,28 @@ public class RuntimeHelper {
     }
 
     public static void destroy(Process process) {
-        // if we're in JellyBean, then we need to kill the process as root, which requires all this
-        // extra UnixProcess logic
+        if (process == null) {
+            return;
+        }
+        // Closing the reader is not sufficient on recent releases: logcat can
+        // remain alive while its pipe is being drained.  Request a graceful
+        // shutdown first and use the public Java 8 hard-stop API when it is
+        // available on the device.
+        try {
             process.destroy();
+        } catch (RuntimeException ignored) {
+            // Best effort; a process which has already exited can throw here.
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            try {
+                if (process.isAlive()) {
+                    process.destroyForcibly();
+                }
+            } catch (RuntimeException ignored) {
+                // Some vendor process implementations do not expose the hard
+                // stop operation even though the API level is high enough.
+            }
+        }
     }
 
 }

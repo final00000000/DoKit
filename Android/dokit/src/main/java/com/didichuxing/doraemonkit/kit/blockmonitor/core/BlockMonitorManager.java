@@ -37,6 +37,11 @@ import java.util.List;
 public class BlockMonitorManager {
     private static final String TAG = "BlockMonitorManager";
     private static final int MAX_SIZE = 50;
+    /**
+     * API 37 (Android 17) uses the public Choreographer frame callback instead
+     * of the main-looper Printer implementation detail.
+     */
+    private static final int API_37 = 37;
 
 
     private static class Holder {
@@ -71,7 +76,11 @@ public class BlockMonitorManager {
             mMonitorCore = new MonitorCore();
         }
         mIsRunning = true;
-        Looper.getMainLooper().setMessageLogging(mMonitorCore);
+        if (Build.VERSION.SDK_INT >= API_37) {
+            mMonitorCore.startFrameMonitor();
+        } else {
+            Looper.getMainLooper().setMessageLogging(mMonitorCore);
+        }
     }
 
     public boolean isRunning() {
@@ -83,7 +92,9 @@ public class BlockMonitorManager {
             LogHelper.i(TAG, "stop when manager is not running");
             return;
         }
-        Looper.getMainLooper().setMessageLogging(null);
+        if (Build.VERSION.SDK_INT < API_37) {
+            Looper.getMainLooper().setMessageLogging(null);
+        }
         if (mMonitorCore != null) {
             mMonitorCore.shutDown();
             mMonitorCore = null;

@@ -7,7 +7,8 @@ import android.os.SystemClock
 import android.util.Log
 import com.didichuxing.doraemonkit.aop.method_stack.StaticMethodObject
 import com.didichuxing.doraemonkit.kit.timecounter.TimeCounterManager
-import java.util.concurrent.ConcurrentHashMap
+import java.util.ArrayDeque
+import java.util.HashMap
 
 /**
  * ================================================
@@ -31,12 +32,20 @@ public object MethodCostUtil {
     /**
      * key className&method
      */
-    private val METHOD_COSTS: ConcurrentHashMap<String, Long?> by lazy { ConcurrentHashMap<String, Long?>() }
+    /**
+     * Timings belong to an invocation, not to a method globally.  A global map
+     * plus a monitor loses nested/parallel calls and makes every instrumented
+     * method contend on one lock.  Keep a small stack per worker thread.
+     */
+    private val methodStarts = ThreadLocal.withInitial {
+        HashMap<String, ArrayDeque<Long>>()
+    }
 
-    @Synchronized
     fun recodeObjectMethodCostStart(thresholdTime: Int, methodName: String, classObj: Any?) {
         try {
-            METHOD_COSTS[methodName] = SystemClock.elapsedRealtime()
+            val starts = methodStarts.get()!!
+            starts.getOrPut(methodName) { ArrayDeque() }
+                .addLast(SystemClock.elapsedRealtime())
             if (classObj is Application) {
                 val methods = methodName.split("&".toRegex()).toTypedArray()
                 if (methods.size == 2) {
@@ -66,12 +75,15 @@ public object MethodCostUtil {
      * @param classObj      调用该函数的对象
      */
     fun recodeObjectMethodCostEnd(thresholdTime: Int, methodName: String, classObj: Any?) {
-        synchronized(MethodCostUtil::class.java) {
-            try {
-                if (METHOD_COSTS.containsKey(methodName)) {
-                    val startTime = METHOD_COSTS[methodName]!!
+        try {
+            val starts = methodStarts.get()
+            val invocationStarts = starts[methodName] ?: return
+            val startTime = if (invocationStarts.isEmpty()) null else invocationStarts.removeLast()
+            if (invocationStarts.isEmpty()) {
+                starts.remove(methodName)
+            }
+            if (startTime != null) {
                     val costTime = (SystemClock.elapsedRealtime() - startTime).toInt()
-                    METHOD_COSTS.remove(methodName)
                     if (classObj is Application) {
                         //Application 启动时间统计
                         val methods = methodName.split("&".toRegex()).toTypedArray()
@@ -93,7 +105,7 @@ public object MethodCostUtil {
 
 
                     //如果该方法的执行时间大于1ms 则记录
-                    if (costTime >= thresholdTime) {
+                    if (costTime >= thresholdTime.coerceAtLeast(0)) {
                         val threadName = Thread.currentThread().name
                         Log.i(TAG, "================Dokit================")
                         Log.i(
@@ -118,10 +130,12 @@ public object MethodCostUtil {
                             Log.i(TAG, "\tat $stackTraceElement")
                         }
                     }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
+            if (starts.isEmpty()) {
+                methodStarts.remove()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

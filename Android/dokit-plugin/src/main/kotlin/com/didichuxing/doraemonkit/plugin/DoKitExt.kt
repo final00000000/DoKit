@@ -174,7 +174,7 @@ fun File.dokitTransform(output: File, transformer: (ByteArray) -> ByteArray = { 
                 it.transform(File(output, base.relativize(it.toURI()).path), transformer)
             }
         }
-        isFile -> when (extension.toLowerCase()) {
+        isFile -> when (extension.lowercase()) {
             "jar" -> JarFile(this).use {
                 it.dokitTransform(output, ::JarArchiveEntry, transformer)
             }

@@ -23,7 +23,6 @@ import com.didichuxing.doraemonkit.kit.network.okhttp.interceptor.DokitExtInterc
 import com.didichuxing.doraemonkit.util.LogUtils
 import com.facebook.drawee.backends.pipeline.Fresco
 import com.facebook.imagepipeline.core.ImagePipelineConfig
-import com.lzy.okgo.OkGo
 import okhttp3.Cache
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -128,11 +127,10 @@ class App : Application() {
             .build()
 
 
-        val client: OkHttpClient = OkHttpClient.Builder()
+        httpClient = OkHttpClient.Builder()
             .addInterceptor(CustomInterceptor())
             .cache(Cache(File("${PathUtils.getInternalAppCachePath()}/dokit"), 1024 * 1024 * 100))
             .build()
-        OkGo.getInstance().init(this).okHttpClient = client
 
         val config = ImagePipelineConfig.newBuilder(this)
             .setDiskCacheEnabled(false)
@@ -182,5 +180,6 @@ class App : Application() {
     companion object {
         private const val TAG = "App"
         var leakActivity: Activity? = null
+        var httpClient: OkHttpClient? = null
     }
 }

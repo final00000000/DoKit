@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.didichuxing.doraemondemo">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--    tools:replace问题参考  https://developer.android.google.cn/studio/build/manifest-merge?hl=zh-cn tools:replace部分-->
     <application
@@ -13,7 +12,9 @@
         android:theme="@style/AppTheme"
         tools:replace="android:allowBackup">
 
-        <activity android:name=".old.MainDebugActivityOkhttpV3">
+        <activity
+            android:name=".old.MainDebugActivityOkhttpV3"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

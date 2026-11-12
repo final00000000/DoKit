@@ -11,6 +11,7 @@ def gitSha() {
 }
 
 android {
+    namespace "com.squareup.leakcanary"
     compileSdkVersion rootProject.ext.android["compileSdkVersion"]
 
     defaultConfig {
@@ -22,17 +23,16 @@ android {
         buildConfigField "String", "LEAKCANARY_LIBRARY_VERSION", "\"1.6.3\""
         buildConfigField "String", "GIT_SHA", "\"${gitSha()}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        javaCompileOptions { annotationProcessorOptions { includeCompileClasspath = true } }
     }
 
     buildTypes {
         debug {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -45,6 +45,7 @@ android {
      */
     buildFeatures {
         //viewBinding = true
+        buildConfig = true
     }
 
 }

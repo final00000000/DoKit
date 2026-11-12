@@ -1,7 +1,6 @@
 package com.didichuxing.doraemonkit.plugin.extension
 
 import groovy.lang.Closure
-import org.gradle.util.ConfigureUtil
 
 /**
  * ================================================
@@ -39,11 +38,17 @@ open class SlowMethodExtension(
     }
 
     fun stackMethod(closure: Closure<StackMethodExt?>?) {
-        ConfigureUtil.configure(closure, stackMethod)
+        closure?.rehydrate(stackMethod, closure.owner, closure.thisObject)?.apply {
+            resolveStrategy = Closure.DELEGATE_FIRST
+            call(stackMethod)
+        }
     }
 
     fun normalMethod(closure: Closure<NormalMethodExt?>?) {
-        ConfigureUtil.configure(closure, normalMethod)
+        closure?.rehydrate(normalMethod, closure.owner, closure.thisObject)?.apply {
+            resolveStrategy = Closure.DELEGATE_FIRST
+            call(normalMethod)
+        }
     }
 
     class StackMethodExt(
