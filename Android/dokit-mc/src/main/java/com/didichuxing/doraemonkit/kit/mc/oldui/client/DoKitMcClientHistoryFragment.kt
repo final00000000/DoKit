@@ -46,10 +46,12 @@ import kotlin.coroutines.suspendCoroutine
 class DoKitMcClientHistoryFragment : BaseFragment() {
 
     private val REQUEST_CODE_SCAN = 0x101
+    private val REQUEST_LOCAL_NETWORK = 0x102
 
     private lateinit var mRv: RecyclerView
     private lateinit var mAdapter: McClientHistoryAdapter
     private lateinit var histories: MutableList<McClientHistory>
+    private var pendingClientHistory: McClientHistory? = null
 
     override fun onRequestLayout(): Int {
         return R.layout.dk_fragment_mc_client_history
@@ -200,6 +202,34 @@ class DoKitMcClientHistoryFragment : BaseFragment() {
     }
 
     private fun handleConnect(clientHistory: McClientHistory) {
+        val hostActivity = activity
+        if (hostActivity != null &&
+            !LocalNetworkPermission.request(hostActivity, REQUEST_LOCAL_NETWORK)
+        ) {
+            pendingClientHistory = clientHistory
+            return
+        }
+        connect(clientHistory)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_LOCAL_NETWORK) {
+            val pending = pendingClientHistory
+            pendingClientHistory = null
+            if (pending != null && LocalNetworkPermission.isGranted(requireContext())) {
+                connect(pending)
+            } else if (pending != null) {
+                ToastUtils.showShort("未获得本地网络权限，未建立连接")
+            }
+        }
+    }
+
+    private fun connect(clientHistory: McClientHistory) {
         DoKitMcClient.connect(clientHistory.host!!, clientHistory.port, clientHistory.path!!) { code, hostInfo ->
             withContext(Dispatchers.Main) {
                 when (code) {

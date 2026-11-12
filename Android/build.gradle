@@ -16,11 +16,26 @@ buildscript {
 
 
     repositories {
-        google()
-        mavenCentral()
-        jcenter()
+        def androidRepositoryMirror = providers.gradleProperty("ANDROID_REPOSITORY_MIRROR").orNull
+        def publicRepositoryMirror = providers.gradleProperty("PUBLIC_REPOSITORY_MIRROR").orNull
+        if (androidRepositoryMirror) {
+            maven { url androidRepositoryMirror }
+        } else {
+            google()
+        }
+        if (publicRepositoryMirror) {
+            maven { url publicRepositoryMirror }
+        } else {
+            mavenCentral()
+        }
         maven {
             url "https://oss.sonatype.org/content/groups/public"
+        }
+        // Weex, BaseRecyclerViewAdapterHelper and Epic were only published to
+        // JCenter. Aliyun's public mirror still serves them, so keep it as a
+        // last-resort fallback for a build that works without extra flags.
+        maven {
+            url "https://maven.aliyun.com/repository/public"
         }
 
         println("[dokit build] add buildscript private repositories")
@@ -43,8 +58,6 @@ buildscript {
         classpath "com.android.tools.build:gradle:$gradlePluginVersion"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
 
-        // MavenCentral
-        classpath "org.jetbrains.dokka:dokka-gradle-plugin:1.4.30"
         if (runType == 1) {
             classpath "io.github.didi.dokit:dokitx-plugin:$dokitPluginVersion"
         }
@@ -62,11 +75,24 @@ apply from: "./config.gradle"
 allprojects {
     def isRootProject = "Dokit-Android".equals(project.name)
     repositories {
-        google()
-        mavenCentral()
-        jcenter()
+        def androidRepositoryMirror = providers.gradleProperty("ANDROID_REPOSITORY_MIRROR").orNull
+        def publicRepositoryMirror = providers.gradleProperty("PUBLIC_REPOSITORY_MIRROR").orNull
+        if (androidRepositoryMirror) {
+            maven { url androidRepositoryMirror }
+        } else {
+            google()
+        }
+        if (publicRepositoryMirror) {
+            maven { url publicRepositoryMirror }
+        } else {
+            mavenCentral()
+        }
         maven {
             url "https://oss.sonatype.org/content/groups/public"
+        }
+        // Last-resort fallback for artifacts that only existed on JCenter.
+        maven {
+            url "https://maven.aliyun.com/repository/public"
         }
 
         println("[dokit build] add allprojects repositories config project=" + project.name)

@@ -9,6 +9,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.PixelFormat;
@@ -20,7 +21,9 @@ import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 
 import androidx.annotation.Nullable;
@@ -109,7 +112,8 @@ public class ScreenRecordingService extends Service {
         // 在API11之后构建Notification的方式
         Intent nfIntent = new Intent(activity, MCActivity.class);
 
-        builder.setContentIntent(PendingIntent.getActivity(activity, 0, nfIntent, 0))
+        builder.setContentIntent(PendingIntent.getActivity(activity, 0, nfIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE))
             .setLargeIcon(BitmapFactory.decodeResource(activity.getResources(), R.mipmap.ic_launcher))
             .setContentTitle("下拉列表中的Title")
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -119,7 +123,11 @@ public class ScreenRecordingService extends Service {
         Notification notification = builder.build(); // 获取构建好的Notification
         notification.defaults = Notification.DEFAULT_SOUND; //设置为默认的声音
 
-        startForeground(100, notification);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(100, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        } else {
+            startForeground(100, notification);
+        }
 
 
         mMediaProjection = mMediaProjectionManager.getMediaProjection(mResultCode, mResultData);
@@ -134,6 +142,12 @@ public class ScreenRecordingService extends Service {
             mImageReader = ImageReader.newInstance(windowWidth, windowHeight, PixelFormat.RGBA_8888, 2, HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
         } else {
             mImageReader = ImageReader.newInstance(windowWidth, windowHeight, PixelFormat.RGBA_8888, 2);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            mMediaProjection.registerCallback(
+                new MediaProjection.Callback() {
+                },
+                new Handler(Looper.getMainLooper()));
         }
         VirtualDisplay mVirtualDisplay = mMediaProjection.createVirtualDisplay("screen-mirror",
             windowWidth, windowHeight, (int) mScreenDensity, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,

@@ -6,11 +6,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkInfo;
+import android.net.NetworkRequest;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -844,6 +848,19 @@ public final class NetworkUtils {
 
         private NetworkType                         mType;
         private Set<OnNetworkStatusChangedListener> mListeners = new HashSet<>();
+        private ConnectivityManager                 mConnectivityManager;
+        private ConnectivityManager.NetworkCallback mNetworkCallback;
+        private boolean                             mNetworkCallbackRegistered;
+        private boolean                             mReceiverRegistered;
+        private final Handler                       mDispatchHandler =
+                new Handler(Looper.getMainLooper());
+        private final Runnable                      mDispatchRunnable =
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        dispatchNetworkChangedNow();
+                    }
+                };
 
         @RequiresPermission(ACCESS_NETWORK_STATE)
         void registerListener(final OnNetworkStatusChangedListener listener) {
@@ -856,8 +873,20 @@ public final class NetworkUtils {
                     mListeners.add(listener);
                     if (preSize == 0 && mListeners.size() == 1) {
                         mType = getNetworkType();
-                        IntentFilter intentFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
-                        Utils.getApp().registerReceiver(NetworkChangedReceiver.getInstance(), intentFilter);
+                        boolean callbackRegistered = registerNetworkCallback();
+                        if (!callbackRegistered) {
+                            // CONNECTIVITY_ACTION is retained only for pre-Lollipop
+                            // devices or when callback registration is unavailable.
+                            IntentFilter intentFilter = new IntentFilter();
+                            intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+                            try {
+                                registerReceiverCompat(intentFilter);
+                                mReceiverRegistered = true;
+                            } catch (RuntimeException ignored) {
+                                // Leave the listener active even if the legacy
+                                // broadcast cannot be registered.
+                            }
+                        }
                     }
                 }
             });
@@ -876,34 +905,133 @@ public final class NetworkUtils {
                     int preSize = mListeners.size();
                     mListeners.remove(listener);
                     if (preSize == 1 && mListeners.size() == 0) {
-                        Utils.getApp().unregisterReceiver(NetworkChangedReceiver.getInstance());
+                        if (mReceiverRegistered) {
+                            try {
+                                Utils.getApp().unregisterReceiver(NetworkChangedReceiver.getInstance());
+                            } catch (IllegalArgumentException ignored) {
+                                // Already unregistered by the host process.
+                            }
+                            mReceiverRegistered = false;
+                        }
+                        mDispatchHandler.removeCallbacks(mDispatchRunnable);
+                        unregisterNetworkCallback();
                     }
                 }
             });
         }
 
+        /**
+         * Use ConnectivityManager callbacks on API 21+ because
+         * CONNECTIVITY_ACTION is deprecated.  The broadcast path remains for
+         * old devices and as a safe fallback when callback registration fails.
+         */
+        private boolean registerNetworkCallback() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                return false;
+            }
+            ConnectivityManager connectivityManager =
+                    (ConnectivityManager) Utils.getApp().getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (connectivityManager == null) return false;
+            ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(@NonNull Network network) {
+                    dispatchNetworkChanged();
+                }
+
+                @Override
+                public void onLost(@NonNull Network network) {
+                    dispatchNetworkChanged();
+                }
+
+                @Override
+                public void onCapabilitiesChanged(@NonNull Network network,
+                                                  @NonNull android.net.NetworkCapabilities networkCapabilities) {
+                    dispatchNetworkChanged();
+                }
+            };
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    // We only care about the app's default route.  Listening to
+                    // every VPN/Wi-Fi/cellular network creates a callback storm
+                    // on devices with multiple simultaneous transports.
+                    connectivityManager.registerDefaultNetworkCallback(callback);
+                } else {
+                    connectivityManager.registerNetworkCallback(
+                            new NetworkRequest.Builder()
+                                    .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                                    .build(), callback);
+                }
+                mConnectivityManager = connectivityManager;
+                mNetworkCallback = callback;
+                mNetworkCallbackRegistered = true;
+                return true;
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+
+        private void unregisterNetworkCallback() {
+            if (!mNetworkCallbackRegistered || mConnectivityManager == null || mNetworkCallback == null) {
+                return;
+            }
+            try {
+                mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
+            } catch (RuntimeException ignored) {
+                // The framework may have already removed the callback.
+            } finally {
+                mNetworkCallbackRegistered = false;
+                mConnectivityManager = null;
+                mNetworkCallback = null;
+            }
+        }
+
+        private void registerReceiverCompat(IntentFilter intentFilter) {
+            Context appContext = Utils.getApp();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(
+                        NetworkChangedReceiver.getInstance(),
+                        intentFilter,
+                        // CONNECTIVITY_ACTION is sent by the system process.
+                        Context.RECEIVER_EXPORTED
+                );
+            } else {
+                appContext.registerReceiver(NetworkChangedReceiver.getInstance(), intentFilter);
+            }
+        }
+
+        private void dispatchNetworkChanged() {
+            // Coalesce capability/link changes.  A single route switch can
+            // produce a dozen callbacks and none of them needs a separate UI
+            // runnable.
+            mDispatchHandler.removeCallbacks(mDispatchRunnable);
+            mDispatchHandler.postDelayed(mDispatchRunnable, 500L);
+        }
+
+        @RequiresPermission(ACCESS_NETWORK_STATE)
+        private void dispatchNetworkChangedNow() {
+            NetworkType networkType = NetworkUtils.getNetworkType();
+            if (mType == networkType) return;
+            mType = networkType;
+            // Listener callbacks are allowed to unregister themselves.  Work on
+            // a snapshot so that a callback cannot invalidate iteration.
+            Set<OnNetworkStatusChangedListener> listeners =
+                    new HashSet<>(mListeners);
+            if (networkType == NetworkType.NETWORK_NO) {
+                for (OnNetworkStatusChangedListener listener : listeners) {
+                    listener.onDisconnected();
+                }
+            } else {
+                for (OnNetworkStatusChangedListener listener : listeners) {
+                    listener.onConnected(networkType);
+                }
+            }
+        }
+
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (ConnectivityManager.CONNECTIVITY_ACTION.equals(intent.getAction())) {
-                // debouncing
-                UtilsBridge.runOnUiThreadDelayed(new Runnable() {
-                    @Override
-                    @RequiresPermission(ACCESS_NETWORK_STATE)
-                    public void run() {
-                        NetworkType networkType = NetworkUtils.getNetworkType();
-                        if (mType == networkType) return;
-                        mType = networkType;
-                        if (networkType == NetworkType.NETWORK_NO) {
-                            for (OnNetworkStatusChangedListener listener : mListeners) {
-                                listener.onDisconnected();
-                            }
-                        } else {
-                            for (OnNetworkStatusChangedListener listener : mListeners) {
-                                listener.onConnected(networkType);
-                            }
-                        }
-                    }
-                }, 1000);
+            if (intent != null && ConnectivityManager.CONNECTIVITY_ACTION.equals(intent.getAction())) {
+                // Debounce the legacy broadcast path just like the callback path.
+                dispatchNetworkChanged();
             }
         }
 

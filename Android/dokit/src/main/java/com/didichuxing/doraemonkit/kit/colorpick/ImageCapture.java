@@ -15,6 +15,8 @@ import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.RequiresApi;
 
@@ -83,6 +85,16 @@ public class ImageCapture {
         int dpi = UIUtils.getDensityDpi();
         //wiki:https://www.jianshu.com/p/d7eb518195fd
         mImageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+        /**
+         * Android 14+ requires a registered callback before creating a virtual
+         * display, otherwise MediaProjection rejects the request.
+         */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            mediaProjection.registerCallback(
+                    new MediaProjection.Callback() {
+                    },
+                    new Handler(Looper.getMainLooper()));
+        }
         /**
          * 获取getSurface
          */

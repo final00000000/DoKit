@@ -25,13 +25,9 @@ import com.didichuxing.doraemondemo.amap.AMapRouterFragment
 import com.didichuxing.doraemondemo.comm.CommLauncher
 import com.didichuxing.doraemondemo.databinding.ActivityMainBinding
 import com.didichuxing.doraemondemo.db.DatabaseHelper
-import com.didichuxing.doraemondemo.mc.MCActivity
 import com.didichuxing.doraemondemo.module.leak.LeakActivity
 import com.didichuxing.doraemondemo.module.retrofit.GithubService
 import com.didichuxing.doraemonkit.DoKit
-import com.lzy.okgo.OkGo
-import com.lzy.okgo.callback.StringCallback
-import com.lzy.okgo.model.Response
 import kotlinx.coroutines.*
 import okhttp3.*
 import org.json.JSONObject
@@ -115,8 +111,6 @@ class MainDebugActivityOkhttpV3 : BaseActivity(), CoroutineScope by MainScope() 
 //                    }
 //                    Log.i(TAG, "===out===")
 
-                    startActivity(Intent(this, MainDoKitActivity::class.java))
-
                 }
                 "系统反射测试" -> {
                     try {
@@ -170,14 +164,8 @@ class MainDebugActivityOkhttpV3 : BaseActivity(), CoroutineScope by MainScope() 
                 "跳转其他Activity" -> {
                     startActivity(Intent(this, EmptyActivity::class.java))
                 }
-                "一机多控" -> {
-                    startActivity(Intent(this, MCActivity::class.java))
-                }
                 "NormalWebView" -> {
                     startActivity(Intent(this, WebViewSystemActivity::class.java))
-                }
-                "X5WebView" -> {
-                    startActivity(Intent(this, WebViewX5Activity::class.java))
                 }
 
                 "模拟内存泄漏" -> {
@@ -200,15 +188,29 @@ class MainDebugActivityOkhttpV3 : BaseActivity(), CoroutineScope by MainScope() 
                     val jsonObject = JSONObject()
                     jsonObject.put("c", "cc")
                     jsonObject.put("d", "dd")
-                    OkGo.post<String>("https://wanandroid.com/user_article/list/0/json?b=bb&a=aa")
-                        .upJson(jsonObject)
-                        .execute(object : StringCallback() {
-                            override fun onSuccess(response: Response<String>?) {
-                                response?.let {
-                                    Log.i(TAG, "okhttp====onSuccess===>" + it.body())
-                                }
+                    val request = Request.Builder()
+                        .url("https://wanandroid.com/user_article/list/0/json?b=bb&a=aa")
+                        .post(
+                            RequestBody.create(
+                                MediaType.parse("application/json"),
+                                jsonObject.toString()
+                            )
+                        )
+                        .build()
+                    (App.httpClient ?: OkHttpClient()).newCall(request)
+                        .enqueue(object : Callback {
+                            override fun onFailure(call: Call, e: IOException) {
+                                Log.i(TAG, "okhttp====onError===>" + e.message)
                             }
 
+                            override fun onResponse(call: Call, response: Response) {
+                                response.use {
+                                    Log.i(
+                                        TAG,
+                                        "okhttp====onSuccess===>" + it.body()?.string()
+                                    )
+                                }
+                            }
                         })
 
 

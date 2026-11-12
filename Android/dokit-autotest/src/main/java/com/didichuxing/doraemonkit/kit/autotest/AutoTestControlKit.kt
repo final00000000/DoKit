@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.didichuxing.doraemonkit.aop.DokitPluginConfig
 import com.didichuxing.doraemonkit.autotest.R
+import com.didichuxing.doraemonkit.R as DoKitR
 import com.didichuxing.doraemonkit.kit.AbstractKit
 import com.didichuxing.doraemonkit.kit.autotest.ui.DoKitAutotestActivity
 import com.didichuxing.doraemonkit.util.DoKitCommUtil
@@ -34,7 +35,7 @@ class AutoTestControlKit : AbstractKit() {
 
     override fun onClickWithReturn(activity: Activity): Boolean {
         if (!DokitPluginConfig.SWITCH_DOKIT_PLUGIN) {
-            ToastUtils.showShort(DoKitCommUtil.getString(R.string.dk_plugin_close_tip))
+            ToastUtils.showShort(DoKitCommUtil.getString(DoKitR.string.dk_plugin_close_tip))
             return false
         }
         val intent = Intent(activity, DoKitAutotestActivity::class.java)

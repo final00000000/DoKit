@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:dist="http://schemas.android.com/apk/distribution"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.didichuxing.doraemondemo">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <dist:module dist:instant="true" />
 
@@ -12,6 +11,8 @@
     <uses-permission android:name="android.permission.INTERNET" /> <!-- tencent Android Q新增权限，允许应用在后台发起定位，如应用target为Q，请添加此权限 -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> <!-- tencent 如果设置了target >= 28 如果需要启动后台定位则必须声明这个权限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" /> <!-- 用于进行网络定位 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> <!-- 用于访问GPS定位 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" /> <!-- 用于获取运营商信息，用于支持提供运营商信息相关的接口 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> <!-- 用于访问wifi网络信息，wifi信息会用于进行网络定位 -->
@@ -31,46 +32,36 @@
         android:theme="@style/AppTheme"
         tools:ignore="GoogleAppIndexingWarning">
 
-        <activity
-            android:name=".MainDoKitActivity"
-            android:theme="@style/NoTitleTheme"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        <activity
-            android:name=".mc.NetMainActivity"
-            android:exported="false" />
         <activity android:name=".WebViewSystemActivity" />
-        <activity android:name=".WebViewX5Activity" />
         <activity android:name=".EmptyActivity" />
         <activity android:name=".module.bigbitmap.BigBitmapActivity" />
         <activity android:name=".module.leak.LeakActivity" />
-        <activity android:name=".mc.MCActivity" />
         <activity android:name="com.amap.api.navi.AmapRouteActivity" />
         <activity
             android:name=".comm.CommFragmentActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <!-- 高德定位服务 -->
-
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="11f9728ee0c2a141663fc4b784c42a33" />
 
         <service android:name="com.amap.api.location.APSService" />
 
+        <!-- 腾讯定位服务 -->
+        <meta-data
+            android:name="TencentMapSDK"
+            android:value="ECSBZ-ZDNCF-4K3J4-JNWQ2-TWW37-XOFNQ" />
+
+        <!-- 百度地图key -->
+        <meta-data
+            android:name="com.baidu.lbsapi.API_KEY"
+            android:value="UhPZI3aQQ7un6RP8evAkXxFCtlvItawi" />
 
         <!-- 百度地图定位服务 -->
         <service
             android:name="com.baidu.location.f"
             android:enabled="true"
             android:process=":remote" />
-
-        <!-- Dokit targetApi为 29 Android Q时截屏的前台服务 -->
-        <service
-            android:name=".test.ScreenRecordingService"
-            android:enabled="true"
-            android:foregroundServiceType="mediaProjection" />
 
     </application>
 

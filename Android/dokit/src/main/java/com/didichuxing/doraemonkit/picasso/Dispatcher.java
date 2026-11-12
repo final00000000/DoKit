@@ -21,7 +21,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkInfo;
+import android.net.NetworkRequest;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -163,7 +166,11 @@ class Dispatcher {
   }
 
   void dispatchNetworkStateChange(NetworkInfo info) {
-    handler.sendMessage(handler.obtainMessage(NETWORK_STATE_CHANGE, info));
+    // A route switch emits several capability/link callbacks.  Coalesce them
+    // on Picasso's dispatcher thread instead of queueing one retry pass per
+    // callback.
+    handler.removeMessages(NETWORK_STATE_CHANGE);
+    handler.sendMessageDelayed(handler.obtainMessage(NETWORK_STATE_CHANGE, info), 100L);
   }
 
   void dispatchAirplaneModeChange(boolean airplaneMode) {
@@ -545,6 +552,10 @@ class Dispatcher {
     static final String EXTRA_AIRPLANE_STATE = "state";
 
     private final Dispatcher dispatcher;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private boolean networkCallbackRegistered;
+    private boolean receiverRegistered;
 
     NetworkBroadcastReceiver(Dispatcher dispatcher) {
       this.dispatcher = dispatcher;
@@ -554,13 +565,93 @@ class Dispatcher {
       IntentFilter filter = new IntentFilter();
       filter.addAction(ACTION_AIRPLANE_MODE_CHANGED);
       if (dispatcher.scansNetworkChanges) {
-        filter.addAction(CONNECTIVITY_ACTION);
+        if (!registerNetworkCallback()) {
+          // CONNECTIVITY_ACTION is retained only for old devices or when the
+          // callback API is unavailable.
+          filter.addAction(CONNECTIVITY_ACTION);
+        }
       }
-      dispatcher.context.registerReceiver(this, filter);
+      try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+          // The filter contains system-originated airplane/connectivity broadcasts.
+          dispatcher.context.registerReceiver(this, filter, Context.RECEIVER_EXPORTED);
+        } else {
+          dispatcher.context.registerReceiver(this, filter);
+        }
+        receiverRegistered = true;
+      } catch (RuntimeException ignored) {
+        // Keep Picasso usable when a host restricts dynamic receivers.
+      }
     }
 
     void unregister() {
-      dispatcher.context.unregisterReceiver(this);
+      if (receiverRegistered) {
+        try {
+          dispatcher.context.unregisterReceiver(this);
+        } catch (IllegalArgumentException ignored) {
+          // The host may have already unregistered this receiver.
+        }
+        receiverRegistered = false;
+      }
+      if (networkCallbackRegistered && connectivityManager != null && networkCallback != null) {
+        try {
+          connectivityManager.unregisterNetworkCallback(networkCallback);
+        } catch (RuntimeException ignored) {
+          // The framework may have already removed the callback.
+        } finally {
+          networkCallbackRegistered = false;
+          connectivityManager = null;
+          networkCallback = null;
+        }
+      }
+    }
+
+    private boolean registerNetworkCallback() {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+        return false;
+      }
+      ConnectivityManager manager = getService(dispatcher.context, CONNECTIVITY_SERVICE);
+      if (manager == null) return false;
+      ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
+        @Override public void onAvailable(Network network) {
+          dispatchCurrentNetworkState();
+        }
+
+        @Override public void onLost(Network network) {
+          dispatchCurrentNetworkState();
+        }
+
+        @Override public void onCapabilitiesChanged(Network network,
+            android.net.NetworkCapabilities networkCapabilities) {
+          dispatchCurrentNetworkState();
+        }
+      };
+      try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          manager.registerDefaultNetworkCallback(callback);
+        } else {
+          manager.registerNetworkCallback(
+              new NetworkRequest.Builder()
+                  .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                  .build(), callback);
+        }
+        connectivityManager = manager;
+        networkCallback = callback;
+        networkCallbackRegistered = true;
+        return true;
+      } catch (RuntimeException ignored) {
+        return false;
+      }
+    }
+
+    private void dispatchCurrentNetworkState() {
+      ConnectivityManager manager = connectivityManager;
+      if (manager == null) {
+        manager = getService(dispatcher.context, CONNECTIVITY_SERVICE);
+      }
+      if (manager != null) {
+        dispatcher.dispatchNetworkStateChange(manager.getActiveNetworkInfo());
+      }
     }
 
     @Override public void onReceive(Context context, Intent intent) {
@@ -575,9 +666,11 @@ class Dispatcher {
           return; // No airplane state, ignore it. Should we query Utils.isAirplaneModeOn?
         }
         dispatcher.dispatchAirplaneModeChange(intent.getBooleanExtra(EXTRA_AIRPLANE_STATE, false));
-      } else if (CONNECTIVITY_ACTION.equals(action)) {
+      } else if (!networkCallbackRegistered && CONNECTIVITY_ACTION.equals(action)) {
         ConnectivityManager connectivityManager = getService(context, CONNECTIVITY_SERVICE);
-        dispatcher.dispatchNetworkStateChange(connectivityManager.getActiveNetworkInfo());
+        if (connectivityManager != null) {
+          dispatcher.dispatchNetworkStateChange(connectivityManager.getActiveNetworkInfo());
+        }
       }
     }
   }

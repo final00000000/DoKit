@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.didichuxing.doraemonkit.R
 import com.didichuxing.doraemonkit.extension.isTrueWithCor
 import com.didichuxing.doraemonkit.kit.core.BaseFragment
+import com.didichuxing.doraemonkit.util.LocalNetworkPermission
 import com.didichuxing.doraemonkit.util.TimeUtils
 import com.didichuxing.doraemonkit.util.ToastUtils
 import com.didichuxing.doraemonkit.widget.recyclerview.DividerItemDecoration
@@ -40,12 +41,14 @@ class DoKitConnectFragment : BaseFragment() {
 
     companion object {
         private const val REQUEST_CODE_SCAN = 0x1008
+        private const val REQUEST_LOCAL_NETWORK = 0x1009
     }
 
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var mAdapter: ConnectListAdapter
     private lateinit var histories: MutableList<ConnectAddress>
+    private var pendingConnectAddress: ConnectAddress? = null
 
 
     override fun onRequestLayout(): Int {
@@ -116,8 +119,31 @@ class DoKitConnectFragment : BaseFragment() {
     }
 
     private fun handleConnect(connectAddress: ConnectAddress) {
+        val hostActivity = activity ?: return
+        if (!LocalNetworkPermission.request(hostActivity, REQUEST_LOCAL_NETWORK)) {
+            pendingConnectAddress = connectAddress
+            return
+        }
         DoKitConnectManager.startConnect(connectAddress)
         updateHistoryView()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_LOCAL_NETWORK) {
+            val pending = pendingConnectAddress
+            pendingConnectAddress = null
+            if (pending != null && LocalNetworkPermission.isGranted(requireContext())) {
+                DoKitConnectManager.startConnect(pending)
+                updateHistoryView()
+            } else if (pending != null) {
+                ToastUtils.showShort("未获得本地网络权限，未建立连接")
+            }
+        }
     }
 
 

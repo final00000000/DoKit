@@ -2,6 +2,7 @@ package com.didichuxing.doraemonkit.kit.performance;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Debug;
 import android.os.Handler;
@@ -11,7 +12,7 @@ import android.os.Message;
 import android.os.Process;
 import android.text.TextUtils;
 import android.view.Choreographer;
-import android.view.WindowManager;
+import android.view.Display;
 
 import androidx.annotation.RequiresApi;
 
@@ -81,7 +82,6 @@ public class PerformanceDataManager {
     private float mMaxMemory;
     private Context mContext;
     private ActivityManager mActivityManager;
-    private WindowManager mWindowManager;
     private RandomAccessFile mProcStatFile;
     private RandomAccessFile mAppStatFile;
     private Long mLastCpuTime;
@@ -93,6 +93,7 @@ public class PerformanceDataManager {
     private static final int MSG_NET_FLOW = 4;
     private Handler mMainHandler = new Handler(Looper.getMainLooper());
     private FrameRateRunnable mRateRunnable = new FrameRateRunnable();
+    private volatile boolean mInitialized;
 
     private void executeCpuData() {
         if (mAboveAndroidO) {
@@ -121,41 +122,58 @@ public class PerformanceDataManager {
     private float getCpuDataForO() {
         java.lang.Process process = null;
         try {
-            process = Runtime.getRuntime().exec("top -n 1");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            // Restrict top to this process.  Parsing the complete process table
+            // every 500 ms is both expensive and increasingly restricted on
+            // modern Android releases.
+            process = new ProcessBuilder("top", "-n", "1", "-p",
+                    String.valueOf(Process.myPid())).redirectErrorStream(true).start();
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()), 4096);
             String line;
             int cpuIndex = -1;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (TextUtils.isEmpty(line)) {
-                    continue;
-                }
-                int tempIndex = getCPUIndex(line);
-                if (tempIndex != -1) {
-                    cpuIndex = tempIndex;
-                    continue;
-                }
-                if (line.startsWith(String.valueOf(Process.myPid()))) {
-                    if (cpuIndex == -1) {
+            try {
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (TextUtils.isEmpty(line)) {
                         continue;
                     }
-                    String[] param = line.split("\\s+");
-                    if (param.length <= cpuIndex) {
+                    int tempIndex = getCPUIndex(line);
+                    if (tempIndex != -1) {
+                        cpuIndex = tempIndex;
                         continue;
                     }
-                    String cpu = param[cpuIndex];
-                    if (cpu.endsWith("%")) {
-                        cpu = cpu.substring(0, cpu.lastIndexOf("%"));
+                    if (line.startsWith(String.valueOf(Process.myPid()))) {
+                        if (cpuIndex == -1) {
+                            continue;
+                        }
+                        String[] param = line.split("\\s+");
+                        if (param.length <= cpuIndex) {
+                            continue;
+                        }
+                        String cpu = param[cpuIndex];
+                        if (cpu.endsWith("%")) {
+                            cpu = cpu.substring(0, cpu.lastIndexOf("%"));
+                        }
+                        float rate = Float.parseFloat(cpu)
+                                / Math.max(1, Runtime.getRuntime().availableProcessors());
+                        return Math.max(0f, Math.min(100f, rate));
                     }
-                    float rate = Float.parseFloat(cpu) / Runtime.getRuntime().availableProcessors();
-                    return rate;
                 }
+            } finally {
+                reader.close();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            // top is optional on vendor builds; the caller will display 0 and
+            // continue sampling through the next tick.
         } finally {
             if (process != null) {
-                process.destroy();
+                try {
+                    process.destroy();
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && process.isAlive()) {
+                        process.destroyForcibly();
+                    }
+                } catch (RuntimeException ignored) {
+                }
             }
         }
         return 0;
@@ -188,11 +206,19 @@ public class PerformanceDataManager {
     public void init() {
         mContext = DoKitEnv.requireApp().getApplicationContext();
         mActivityManager = (ActivityManager) DoKitEnv.requireApp().getSystemService(Context.ACTIVITY_SERVICE);
-        mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
-        if (mWindowManager != null) {
-            mMaxFrameRate = (int) mWindowManager.getDefaultDisplay().getRefreshRate();
-        } else {
-            mMaxFrameRate = MAX_FRAME_RATE;
+        // WindowManager#getDefaultDisplay() is deprecated since API 30.  The
+        // DisplayManager API is public, works with the application context and
+        // keeps the old minSdk fallback intact.
+        mMaxFrameRate = MAX_FRAME_RATE;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            DisplayManager displayManager =
+                    (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
+            Display display = displayManager == null
+                    ? null
+                    : displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+            if (display != null && display.getRefreshRate() > 0) {
+                mMaxFrameRate = Math.round(display.getRefreshRate());
+            }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -212,16 +238,22 @@ public class PerformanceDataManager {
                         if (AppUtils.isAppForeground()) {
                             executeCpuData();
                         }
-                        mNormalHandler.sendEmptyMessageDelayed(MSG_CPU, NORMAL_SAMPLING_TIME);
+                        if (DokitMemoryConfig.CPU_STATUS) {
+                            mNormalHandler.sendEmptyMessageDelayed(MSG_CPU, NORMAL_SAMPLING_TIME);
+                        }
                     } else if (msg.what == MSG_MEMORY) {
                         if (AppUtils.isAppForeground()) {
                             executeMemoryData();
                         }
-                        mNormalHandler.sendEmptyMessageDelayed(MSG_MEMORY, NORMAL_SAMPLING_TIME);
+                        if (DokitMemoryConfig.RAM_STATUS) {
+                            mNormalHandler.sendEmptyMessageDelayed(MSG_MEMORY, NORMAL_SAMPLING_TIME);
+                        }
                     } else if (msg.what == MSG_NET_FLOW) {
                         mLastUpBytes = NetworkManager.get().getTotalRequestSize() - mUpBytes;
                         mLastDownBytes = NetworkManager.get().getTotalResponseSize() - mDownBytes;
-                        mNormalHandler.sendEmptyMessageDelayed(MSG_NET_FLOW, NORMAL_SAMPLING_TIME);
+                        if (DokitMemoryConfig.NETWORK_STATUS) {
+                            mNormalHandler.sendEmptyMessageDelayed(MSG_NET_FLOW, NORMAL_SAMPLING_TIME);
+                        }
                     }
 //                    else if (msg.what == MSG_SAVE_LOCAL) {
 //                        saveToLocal();
@@ -230,6 +262,7 @@ public class PerformanceDataManager {
                 }
             };
         }
+        mInitialized = true;
     }
 
     private String getFilePath(Context context) {
@@ -238,8 +271,14 @@ public class PerformanceDataManager {
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
     public void startMonitorFrameInfo() {
+        ensureInitialized();
+        if (DokitMemoryConfig.FPS_STATUS) {
+            return;
+        }
         DokitMemoryConfig.FPS_STATUS = true;
         //开启定时任务
+        mMainHandler.removeCallbacks(mRateRunnable);
+        Choreographer.getInstance().removeFrameCallback(mRateRunnable);
         mMainHandler.postDelayed(mRateRunnable, FPS_SAMPLING_TIME);
         Choreographer.getInstance().postFrameCallback(mRateRunnable);
     }
@@ -252,18 +291,30 @@ public class PerformanceDataManager {
     }
 
     public void startMonitorCPUInfo() {
+        ensureInitialized();
+        if (DokitMemoryConfig.CPU_STATUS) {
+            return;
+        }
         DokitMemoryConfig.CPU_STATUS = true;
+        mNormalHandler.removeMessages(MSG_CPU);
         mNormalHandler.sendEmptyMessageDelayed(MSG_CPU, NORMAL_SAMPLING_TIME);
     }
 
     public void startMonitorNetFlowInfo() {
+        ensureInitialized();
+        if (DokitMemoryConfig.NETWORK_STATUS) {
+            return;
+        }
         DokitMemoryConfig.NETWORK_STATUS = true;
+        mNormalHandler.removeMessages(MSG_NET_FLOW);
         mNormalHandler.sendEmptyMessageDelayed(MSG_NET_FLOW, NORMAL_SAMPLING_TIME);
     }
 
     public void stopMonitorNetFlowInfo() {
         DokitMemoryConfig.NETWORK_STATUS = false;
-        mNormalHandler.removeMessages(MSG_NET_FLOW);
+        if (mNormalHandler != null) {
+            mNormalHandler.removeMessages(MSG_NET_FLOW);
+        }
     }
 
 
@@ -274,28 +325,39 @@ public class PerformanceDataManager {
         if (mHandlerThread != null) {
             mHandlerThread.quit();
         }
+        closeCpuFiles();
         mHandlerThread = null;
         mNormalHandler = null;
+        mInitialized = false;
     }
 
 
     public void stopMonitorCPUInfo() {
         DokitMemoryConfig.CPU_STATUS = false;
-        mNormalHandler.removeMessages(MSG_CPU);
+        if (mNormalHandler != null) {
+            mNormalHandler.removeMessages(MSG_CPU);
+        }
     }
 
 
     public void startMonitorMemoryInfo() {
+        ensureInitialized();
+        if (DokitMemoryConfig.RAM_STATUS) {
+            return;
+        }
         DokitMemoryConfig.RAM_STATUS = true;
         if (mMaxMemory == 0) {
             mMaxMemory = mActivityManager.getMemoryClass();
         }
+        mNormalHandler.removeMessages(MSG_MEMORY);
         mNormalHandler.sendEmptyMessageDelayed(MSG_MEMORY, NORMAL_SAMPLING_TIME);
     }
 
     public void stopMonitorMemoryInfo() {
         DokitMemoryConfig.RAM_STATUS = false;
-        mNormalHandler.removeMessages(MSG_MEMORY);
+        if (mNormalHandler != null) {
+            mNormalHandler.removeMessages(MSG_MEMORY);
+        }
     }
 
     private void writeCpuDataIntoFile() {
@@ -347,8 +409,14 @@ public class PerformanceDataManager {
             }
             String procStatString = mProcStatFile.readLine();
             String appStatString = mAppStatFile.readLine();
-            String procStats[] = procStatString.split(" ");
-            String appStats[] = appStatString.split(" ");
+            if (TextUtils.isEmpty(procStatString) || TextUtils.isEmpty(appStatString)) {
+                return value;
+            }
+            String procStats[] = procStatString.trim().split("\\s+");
+            String appStats[] = appStatString.trim().split("\\s+");
+            if (procStats.length < 9 || appStats.length < 15) {
+                return value;
+            }
             cpuTime = Long.parseLong(procStats[2]) + Long.parseLong(procStats[3])
                     + Long.parseLong(procStats[4]) + Long.parseLong(procStats[5])
                     + Long.parseLong(procStats[6]) + Long.parseLong(procStats[7])
@@ -359,7 +427,13 @@ public class PerformanceDataManager {
                 mLastAppCpuTime = appTime;
                 return value;
             }
-            value = ((float) (appTime - mLastAppCpuTime) / (float) (cpuTime - mLastCpuTime)) * 100f;
+            long totalDelta = cpuTime - mLastCpuTime;
+            long appDelta = appTime - mLastAppCpuTime;
+            if (totalDelta <= 0L || appDelta < 0L) {
+                return value;
+            }
+            value = ((float) appDelta / (float) totalDelta) * 100f;
+            value = Math.max(0f, Math.min(100f, value));
             mLastCpuTime = cpuTime;
             mLastAppCpuTime = appTime;
         } catch (Exception e) {
@@ -485,6 +559,9 @@ public class PerformanceDataManager {
 
         @Override
         public void run() {
+            if (!DokitMemoryConfig.FPS_STATUS) {
+                return;
+            }
             mLastFrameRate = totalFramesPerSecond;
             if (mLastFrameRate > mMaxFrameRate) {
                 mLastFrameRate = mMaxFrameRate;
@@ -501,10 +578,38 @@ public class PerformanceDataManager {
         //
         @Override
         public void doFrame(long frameTimeNanos) {
+            if (!DokitMemoryConfig.FPS_STATUS) {
+                return;
+            }
             totalFramesPerSecond++;
             Choreographer.getInstance().postFrameCallback(this);
         }
 
+    }
+
+    private synchronized void ensureInitialized() {
+        if (!mInitialized || mNormalHandler == null || mHandlerThread == null) {
+            init();
+        }
+    }
+
+    private void closeCpuFiles() {
+        if (mProcStatFile != null) {
+            try {
+                mProcStatFile.close();
+            } catch (IOException ignored) {
+            }
+            mProcStatFile = null;
+        }
+        if (mAppStatFile != null) {
+            try {
+                mAppStatFile.close();
+            } catch (IOException ignored) {
+            }
+            mAppStatFile = null;
+        }
+        mLastCpuTime = null;
+        mLastAppCpuTime = null;
     }
 
     public long getLastUpBytes() {

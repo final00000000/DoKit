@@ -15,3 +15,6 @@ local.properties
 .settings/
 /*/*.iml
 /*/*/*.iml
+
+# Kotlin compiler session data
+.kotlin/

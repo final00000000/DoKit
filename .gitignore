@@ -25,3 +25,7 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Local tool state (Command Code / Kotlin sessions)
+.commandcode/
+.kotlin/

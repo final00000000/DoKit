@@ -102,9 +102,14 @@ public class NotificationUtils {
             nm.createNotificationChannel(channelConfig.getNotificationChannel());
         }
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(Utils.getApp());
+        NotificationCompat.Builder builder;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder.setChannelId(channelConfig.mNotificationChannel.getId());
+            // Supplying the channel in the constructor avoids the deprecated
+            // channel-less builder and guarantees a channel on API 26+.
+            builder = new NotificationCompat.Builder(
+                    Utils.getApp(), channelConfig.mNotificationChannel.getId());
+        } else {
+            builder = new NotificationCompat.Builder(Utils.getApp());
         }
         if (consumer != null) {
             consumer.accept(builder);

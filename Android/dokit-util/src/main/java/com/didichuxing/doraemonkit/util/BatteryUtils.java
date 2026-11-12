@@ -109,7 +109,7 @@ public final class BatteryUtils {
                     if (preSize == 0 && mListeners.size() == 1) {
                         IntentFilter intentFilter = new IntentFilter();
                         intentFilter.addAction(Intent.ACTION_BATTERY_CHANGED);
-                        Utils.getApp().registerReceiver(BatteryChangedReceiver.getInstance(), intentFilter);
+                        registerReceiverCompat(intentFilter);
                     }
                 }
             });
@@ -147,6 +147,24 @@ public final class BatteryUtils {
                         }
                     }
                 });
+            }
+        }
+
+        /**
+         * Register for the protected battery system broadcast with an
+         * explicit export flag on Android 13 (API 33) and newer.
+         */
+        private void registerReceiverCompat(IntentFilter intentFilter) {
+            Context appContext = Utils.getApp();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(
+                        BatteryChangedReceiver.getInstance(),
+                        intentFilter,
+                        // BATTERY_CHANGED is sent by the system process.
+                        Context.RECEIVER_EXPORTED
+                );
+            } else {
+                appContext.registerReceiver(BatteryChangedReceiver.getInstance(), intentFilter);
             }
         }
 

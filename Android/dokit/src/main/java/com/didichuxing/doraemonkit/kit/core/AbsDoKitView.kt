@@ -94,6 +94,7 @@ abstract class AbsDoKitView : DoKitView, TouchProxy.OnTouchEventListener, DoKitV
     private var mHandler: Handler? = Looper.myLooper()?.let { Handler(it) }
 
     private val mInnerReceiver = InnerReceiver()
+    private var innerReceiverRegistered = false
 
     /**
      * 当前dokitViewName 用来当做map的key 和dokitViewIntent的tag一致
@@ -261,7 +262,19 @@ abstract class AbsDoKitView : DoKitView, TouchProxy.OnTouchEventListener, DoKitV
                 mDoKitViewLayoutParams.gravity = GravityCompat.START or Gravity.TOP
                 //动态注册关闭系统弹窗的广播
                 val intentFilter = IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-                context.registerReceiver(mInnerReceiver, intentFilter)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // Android 13+ requires an explicit export policy for every
+                    // context-registered receiver.  This broadcast is emitted
+                    // by the system, so an exported receiver is required.
+                    context.registerReceiver(
+                        mInnerReceiver,
+                        intentFilter,
+                        Context.RECEIVER_EXPORTED
+                    )
+                } else {
+                    context.registerReceiver(mInnerReceiver, intentFilter)
+                }
+                innerReceiverRegistered = true
             }
             initDokitViewLayoutParams(mDoKitViewLayoutParams)
             if (isNormalMode) {
@@ -280,8 +293,14 @@ abstract class AbsDoKitView : DoKitView, TouchProxy.OnTouchEventListener, DoKitV
     }
 
     fun performDestroy() {
-        if (!isNormalMode) {
-            context?.unregisterReceiver(mInnerReceiver)
+        if (!isNormalMode && innerReceiverRegistered) {
+            try {
+                context?.unregisterReceiver(mInnerReceiver)
+            } catch (_: IllegalArgumentException) {
+                // The host may have already torn down the receiver.
+            } finally {
+                innerReceiverRegistered = false
+            }
         }
         //移除布局监听
         removeViewTreeObserverListener()
@@ -871,7 +890,7 @@ abstract class AbsDoKitView : DoKitView, TouchProxy.OnTouchEventListener, DoKitV
                         updateViewLayout(tag, false)
                     }
                     addListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator?) {
+                        override fun onAnimationEnd(animation: Animator) {
                             endMoveAndRecord()
                         }
                     })
@@ -886,7 +905,7 @@ abstract class AbsDoKitView : DoKitView, TouchProxy.OnTouchEventListener, DoKitV
                     mWindowManager.updateViewLayout(mRootView, layoutAttrs)
                 }
                 addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator?) {
+                    override fun onAnimationEnd(animation: Animator) {
                         endMoveAndRecord()
                     }
                 })

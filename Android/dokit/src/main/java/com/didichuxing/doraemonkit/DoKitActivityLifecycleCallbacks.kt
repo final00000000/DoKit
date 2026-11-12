@@ -3,6 +3,7 @@ package com.didichuxing.doraemonkit
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
@@ -14,6 +15,7 @@ import com.didichuxing.doraemonkit.kit.core.DoKitManager
 import com.didichuxing.doraemonkit.kit.core.DoKitViewManager
 import com.didichuxing.doraemonkit.kit.health.AppHealthInfoUtil
 import com.didichuxing.doraemonkit.kit.health.model.AppHealthInfo.DataBean.UiLevelBean
+import com.didichuxing.doraemonkit.kit.timecounter.TimeCounterManager
 import com.didichuxing.doraemonkit.kit.uiperformance.UIPerformanceUtil
 import com.didichuxing.doraemonkit.model.ViewInfo
 import com.didichuxing.doraemonkit.util.DoKitPermissionUtil
@@ -62,6 +64,11 @@ class DoKitActivityLifecycleCallbacks : Application.ActivityLifecycleCallbacks {
 
     override fun onActivityStarted(activity: Activity) {
         try {
+            // ActivityLifecycleCallbacks only exposed the post callback before API 29.
+            // Use the earliest public callback as a coarse launch-start fallback there.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                TimeCounterManager.get().onActivityLaunch()
+            }
             if (ignoreCurrentActivityDokitView(activity)) {
                 return
             }
@@ -95,10 +102,22 @@ class DoKitActivityLifecycleCallbacks : Application.ActivityLifecycleCallbacks {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            // On API 28 and lower this is the best public approximation of the
+            // post-resume boundary. API 29+ uses onActivityPostResumed below.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                TimeCounterManager.get().onActivityLaunched()
+            }
         }
     }
 
     override fun onActivityPaused(activity: Activity) {
+        val legacyTiming = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+        if (legacyTiming) {
+            // There is no public pre-pause callback before API 29. Keep the
+            // measurement usable without reflecting into ActivityThread.
+            TimeCounterManager.get().onActivityPause()
+        }
         try {
             if (ignoreCurrentActivityDokitView(activity)) {
                 return
@@ -109,7 +128,32 @@ class DoKitActivityLifecycleCallbacks : Application.ActivityLifecycleCallbacks {
             DoKitViewManager.INSTANCE.onActivityPaused(activity)
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            if (legacyTiming) {
+                TimeCounterManager.get().onActivityPaused()
+            }
         }
+    }
+
+    /**
+     * Public pre/post lifecycle callbacks were added in API 29. They replace
+     * the old ActivityThread.mH/Instrumentation hook and continue to work on
+     * newer releases (including Android 17) without hidden API access.
+     */
+    override fun onActivityPreResumed(activity: Activity) {
+        TimeCounterManager.get().onActivityLaunch()
+    }
+
+    override fun onActivityPostResumed(activity: Activity) {
+        TimeCounterManager.get().onActivityLaunched()
+    }
+
+    override fun onActivityPrePaused(activity: Activity) {
+        TimeCounterManager.get().onActivityPause()
+    }
+
+    override fun onActivityPostPaused(activity: Activity) {
+        TimeCounterManager.get().onActivityPaused()
     }
 
     override fun onActivityStopped(activity: Activity) {
@@ -262,16 +306,16 @@ class DoKitActivityLifecycleCallbacks : Application.ActivityLifecycleCallbacks {
         lifeCycleStatus: DoKitLifeCycleStatus
     ) {
         var activityLifeCycleStatusInfo: ActivityLifecycleStatusInfo? =
-            DoKitManager.ACTIVITY_LIFECYCLE_INFOS[activity.javaClass.canonicalName]
+            DoKitManager.ACTIVITY_LIFECYCLE_INFOS[activity.javaClass.name]
 
         if (activityLifeCycleStatusInfo == null) {
             activityLifeCycleStatusInfo = ActivityLifecycleStatusInfo(
                 isInvokeStopMethod = false,
                 lifeCycleStatus = DoKitLifeCycleStatus.CREATED,
-                activityName = activity.javaClass.canonicalName
+                activityName = activity.javaClass.name
             )
 
-            DoKitManager.ACTIVITY_LIFECYCLE_INFOS[activity.javaClass.canonicalName!!] =
+            DoKitManager.ACTIVITY_LIFECYCLE_INFOS[activity.javaClass.name] =
                 activityLifeCycleStatusInfo
         }
 
@@ -290,7 +334,7 @@ class DoKitActivityLifecycleCallbacks : Application.ActivityLifecycleCallbacks {
                 activityLifeCycleStatusInfo.isInvokeStopMethod = true
             }
             DoKitLifeCycleStatus.DESTROYED -> {
-                DoKitManager.ACTIVITY_LIFECYCLE_INFOS.remove(activity.javaClass.canonicalName)
+                DoKitManager.ACTIVITY_LIFECYCLE_INFOS.remove(activity.javaClass.name)
             }
 
         }

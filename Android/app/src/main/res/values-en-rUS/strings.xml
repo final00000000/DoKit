@@ -20,4 +20,9 @@
     <string name="app_btn_create_database">Create DB</string>
     <string name="app_btn_upload_file">Upload File</string>
     <string name="app_btn_download_file">Download File</string>
+    <string name="dk_kit_demo">demo</string>
+    <string name="dk_titlebar_back">&#060;</string>
+    <string name="app_btn_installed_app">Installed Apps</string>
+    <string name="app_btn_path_amap">AMap Route</string>
+    <string name="dk_kit_gps_mock_preset">Location Presets</string>
 </resources>

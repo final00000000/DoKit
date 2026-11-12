@@ -278,7 +278,7 @@ object AutoTestManager {
                     }
                 }
             }
-
+            else -> return false
         }
         return false
     }
@@ -305,6 +305,7 @@ object AutoTestManager {
                     }
                 }
             }
+            else -> return 1000
         }
         return 1000
     }

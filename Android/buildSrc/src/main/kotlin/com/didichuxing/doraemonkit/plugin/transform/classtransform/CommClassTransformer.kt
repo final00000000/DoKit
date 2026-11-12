@@ -6,9 +6,8 @@ import com.didichuxing.doraemonkit.plugin.extension.SlowMethodExtension
 import com.didichuxing.doraemonkit.plugin.formatSuperName
 import com.didichuxing.doraemonkit.plugin.lastPath
 import com.didichuxing.doraemonkit.plugin.println
-import com.didiglobal.booster.transform.TransformContext
-import com.didiglobal.booster.transform.asm.className
-import org.gradle.api.Project
+import com.didichuxing.doraemonkit.plugin.transform.TransformContext
+import com.didichuxing.doraemonkit.plugin.transform.className
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.*
 
@@ -39,7 +38,7 @@ class CommClassTransformer : AbsClassTransformer() {
     /**
      * 类处理转化实现
      */
-    override fun transform(project: Project, dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
+    override fun transform(dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
         val className = klass.className
 
         //查找DoraemonKitReal&pluginConfig方法并插入指定字节码

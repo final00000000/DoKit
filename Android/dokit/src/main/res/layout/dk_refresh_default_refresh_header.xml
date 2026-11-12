@@ -35,17 +35,17 @@
         android:scaleType="fitCenter"
         android:src="@mipmap/dk_refresh_arrow" />
 
-    <com.github.ybq.android.spinkit.SpinKitView
+    <ProgressBar
         android:id="@+id/loadingIcon"
-        style="@style/SpinKitView.Small.Circle"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:layout_centerVertical="true"
         android:layout_gravity="center"
         android:layout_marginRight="5dp"
         android:layout_toLeftOf="@+id/text"
+        android:indeterminate="true"
+        android:indeterminateTint="#FF4081"
         android:padding="3dp"
-        android:visibility="gone"
-        app:SpinKit_Color="#FF4081" />
+        android:visibility="gone" />
 
 </RelativeLayout>

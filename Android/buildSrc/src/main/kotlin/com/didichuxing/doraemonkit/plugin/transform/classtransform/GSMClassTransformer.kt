@@ -3,10 +3,9 @@ package com.didichuxing.doraemonkit.plugin.transform.classtransform
 import com.didichuxing.doraemonkit.plugin.*
 import com.didichuxing.doraemonkit.plugin.extension.DoKitExtension
 import com.didichuxing.doraemonkit.plugin.extension.SlowMethodExtension
-import com.didiglobal.booster.transform.TransformContext
-import com.didiglobal.booster.transform.asm.asIterable
-import com.didiglobal.booster.transform.asm.className
-import org.gradle.api.Project
+import com.didichuxing.doraemonkit.plugin.asIterable
+import com.didichuxing.doraemonkit.plugin.transform.TransformContext
+import com.didichuxing.doraemonkit.plugin.transform.className
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.*
 
@@ -28,7 +27,7 @@ import org.objectweb.asm.tree.*
 class GSMClassTransformer : AbsClassTransformer() {
     val thresholdTime = DoKitExtUtil.slowMethodExt.normalMethod.thresholdTime
 
-    override fun transform(project: Project, dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
+    override fun transform(dokit: DoKitExtension, context: TransformContext, klass: ClassNode): ClassNode {
 
         if (!DoKitExtUtil.dokitSlowMethodSwitchOpen()) {
             return klass

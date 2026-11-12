@@ -9,6 +9,10 @@
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 17 (API 37) gates direct LAN sockets and local HTTP/WebSocket
+         servers behind a runtime permission.  Older releases ignore this
+         declaration and continue to use INTERNET as before. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <!-- IO -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -27,8 +31,12 @@
     <!--leakCanary-->
     <!-- To allow starting foreground services on Android P+ - https://developer.android.com/preview/behavior-changes#fg-svc -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!--map -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The SDK never prompts automatically; host apps may request this on
+         API 33+ when they opt in to DoKit notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
     <!--    networkSecurityConfig 兼容android P 的网络请求
